@@ -11,7 +11,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.ibm.com/Purnanand-Kumar1/Fusion-AI.git
+    repoURL: https://github.com/the-dev-collection/Fusion-AI.git
     targetRevision: main
     path: fusion-AgenticAssistanceSampleApp/gitops/llmops-application.yaml
   destination:

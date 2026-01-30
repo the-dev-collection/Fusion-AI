@@ -14,7 +14,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.ibm.com/Purnanand-Kumar1/Fusion-AI.git
+    repoURL: https://github.com/the-dev-collection/Fusion-AI.git
     targetRevision: main
     path: fusion-AgenticAssistanceSampleApp/gitops/applications
   destination:
@@ -43,7 +43,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.ibm.com/Purnanand-Kumar1/Fusion-AI.git
+    repoURL: https://github.com/the-dev-collection/Fusion-AI.git
     targetRevision: main
     path: fusion-model-serving/gitops/models
   destination:
