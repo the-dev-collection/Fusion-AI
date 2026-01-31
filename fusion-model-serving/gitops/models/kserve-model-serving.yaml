@@ -10,7 +10,6 @@ metadata:
   annotations:
     # Ensure this is created after ConfigMap
     argocd.argoproj.io/sync-wave: "0"
-    serving.kserve.io/enable-auth: "false"
 spec:
   predictor:
     serviceAccountName: default
