@@ -31,7 +31,7 @@ spec:
       env:
       # Load Granite model from Hugging Face Hub (publicly available)
       - name: MODEL
-        value: "ibm-granite/granite-3.1-2b-base"  # Publicly available Granite model
+        value: "ibm-granite/granite-3.2-8b-instruct"  # Publicly available Granite model
       - name: HF_HOME
         value: "/tmp/hf_cache"  # Use writable directory for Hugging Face cache
       - name: VLLM_CACHE_ROOT
@@ -41,7 +41,7 @@ spec:
       # vLLM uses OpenAI-compatible API format
       args:
       - --model
-      - ibm-granite/granite-3.1-2b-base  # Direct model name (no variable substitution in args)
+      - ibm-granite/granite-3.2-8b-instruct  # Direct model name (no variable substitution in args)
       - --host
       - "0.0.0.0"
       - --port
