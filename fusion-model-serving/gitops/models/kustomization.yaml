@@ -1,7 +1,9 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-namespace: krishi-rakshak-ds
+# Namespace will be automatically set by ArgoCD from Application CR's destination.namespace
+# This allows you to specify the namespace in the Application CR itself
+# Remove the hardcoded namespace to let ArgoCD handle it
 
 resources:
   - rbac.yaml
@@ -12,5 +14,14 @@ resources:
 commonLabels:
   app.kubernetes.io/name: llmops-models
   validated-patterns.io/pattern: llmops-platform
+
+# ConfigMap generator for model configuration
+# CHANGE MODEL HERE: Update the MODEL_NAME value to use a different model
+configMapGenerator:
+  - name: model-config
+    literals:
+      - MODEL_NAME=ibm-granite/granite-3.2-8b-instruct
+    options:
+      disableNameSuffixHash: true
 
 

@@ -1,9 +1,10 @@
-# RBAC for ArgoCD to deploy KServe InferenceServices in default-dsc namespace
+# RBAC for ArgoCD to deploy KServe InferenceServices
+# Namespace will be set by Kustomize from Application CR's destination.namespace
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: argocd-manager
-  namespace: krishi-rakshak-ds
+  # Namespace will be set by Kustomize from Application CR's destination.namespace
 rules:
 - apiGroups:
   - serving.kserve.io
@@ -37,7 +38,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: argocd-manager
-  namespace: krishi-rakshak-ds
+  # Namespace will be set by Kustomize from Application CR's destination.namespace
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role

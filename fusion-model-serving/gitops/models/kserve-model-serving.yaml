@@ -2,7 +2,7 @@ apiVersion: serving.kserve.io/v1beta1
 kind: InferenceService
 metadata:
   name: granite-llm
-  namespace: krishi-rakshak-ds
+  # Namespace will be set by Kustomize from Application CR's destination.namespace
   labels:
     app: llm-serving
     model: granite
@@ -29,9 +29,12 @@ spec:
           memory: "16Gi"
           cpu: "4"
       env:
-      # Load Granite model from Hugging Face Hub (publicly available)
+      # Load model from Hugging Face Hub - model name comes from ConfigMap
       - name: MODEL
-        value: "ibm-granite/granite-3.2-8b-instruct"  # Publicly available Granite model
+        valueFrom:
+          configMapKeyRef:
+            name: model-config
+            key: MODEL_NAME
       - name: HF_HOME
         value: "/tmp/hf_cache"  # Use writable directory for Hugging Face cache
       - name: VLLM_CACHE_ROOT
@@ -41,7 +44,7 @@ spec:
       # vLLM uses OpenAI-compatible API format
       args:
       - --model
-      - ibm-granite/granite-3.2-8b-instruct  # Direct model name (no variable substitution in args)
+      - $(MODEL)  # Reference the MODEL environment variable
       - --host
       - "0.0.0.0"
       - --port

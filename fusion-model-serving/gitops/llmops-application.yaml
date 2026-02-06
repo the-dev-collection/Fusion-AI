@@ -30,6 +30,7 @@ spec:
 ---
 # Application 2: LLM Models
 # Deploys LLM model serving on OpenShift AI
+# You can customize the target namespace by changing the destination.namespace field
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -46,8 +47,10 @@ spec:
     repoURL: https://github.com/the-dev-collection/Fusion-AI.git
     targetRevision: main
     path: fusion-model-serving/gitops/models
+    # Kustomize will use the namespace from destination.namespace
   destination:
     server: https://kubernetes.default.svc
+    # CUSTOMIZE THIS: Change the namespace to your desired target namespace
     namespace: krishi-rakshak-ds
   syncPolicy:
     automated:
