@@ -30,7 +30,7 @@ spec:
 ---
 # Application 2: LLM Models
 # Deploys LLM model serving on OpenShift AI
-# You can customize the target namespace by changing the destination.namespace field
+# CUSTOMIZE: Change model_name and inferenceservice_name parameters below
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -47,7 +47,23 @@ spec:
     repoURL: https://github.com/the-dev-collection/Fusion-AI.git
     targetRevision: main
     path: fusion-model-serving/gitops/models
-    # Kustomize will use the namespace from destination.namespace
+    kustomize:
+      # CONFIGURE YOUR MODEL HERE
+      # Change these two parameters to deploy any Hugging Face model
+      patches:
+        - target:
+            kind: ConfigMap
+            name: model-config
+          patch: |-
+            - op: replace
+              path: /data/MODEL_NAME
+              value: ibm-granite/granite-3.2-8b-instruct
+        - target:
+            kind: InferenceService
+          patch: |-
+            - op: replace
+              path: /metadata/name
+              value: granite-3-2-8b-instruct
   destination:
     server: https://kubernetes.default.svc
     # CUSTOMIZE THIS: Change the namespace to your desired target namespace

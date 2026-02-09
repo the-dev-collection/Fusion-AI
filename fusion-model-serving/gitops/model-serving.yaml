@@ -1,0 +1,73 @@
+---
+# LLM Model Serving Application
+# Deploys LLM model serving on OpenShift AI with KServe
+# 
+# CUSTOMIZE YOUR MODEL HERE:
+# 1. Change MODEL_NAME to any Hugging Face model
+# 2. Change inferenceservice_name (derived from model name)
+# 3. Change namespace if needed
+#
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: llmops-models
+  namespace: openshift-gitops
+  labels:
+    app.kubernetes.io/name: llmops-models
+    validated-patterns.io/pattern: llmops-platform
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/the-dev-collection/Fusion-AI.git
+    targetRevision: main
+    path: fusion-model-serving/gitops/models
+    kustomize:
+      # ============================================================================
+      # CONFIGURE YOUR MODEL HERE
+      # ============================================================================
+      # 1. MODEL_NAME: The Hugging Face model to deploy
+      # 2. InferenceService name: Kubernetes-compatible name derived from model
+      #
+      # Name Conversion Rules:
+      #   - Take the part after "/" in MODEL_NAME
+      #   - Replace dots (.) with dashes (-)
+      #   - Convert to lowercase
+      #
+      # Examples:
+      #   ibm-granite/granite-3.2-8b-instruct → granite-3-2-8b-instruct
+      #   meta-llama/Meta-Llama-3.1-8B-Instruct → meta-llama-3-1-8b-instruct
+      #   mistralai/Mistral-7B-Instruct-v0.2 → mistral-7b-instruct-v0-2
+      # ============================================================================
+      patches:
+        # Patch 1: Set the MODEL_NAME in ConfigMap
+        - target:
+            kind: ConfigMap
+            name: model-config
+          patch: |-
+            - op: replace
+              path: /data/MODEL_NAME
+              value: ibm-granite/granite-3.2-8b-instruct
+        
+        # Patch 2: Set the InferenceService name
+        - target:
+            kind: InferenceService
+          patch: |-
+            - op: replace
+              path: /metadata/name
+              value: granite-3-2-8b-instruct
+  
+  destination:
+    server: https://kubernetes.default.svc
+    # CUSTOMIZE THIS: Change the namespace to your desired target namespace
+    namespace: krishi-rakshak-ds
+  
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+
+# Made with Bob

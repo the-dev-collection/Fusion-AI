@@ -16,12 +16,11 @@ commonLabels:
   validated-patterns.io/pattern: llmops-platform
 
 # ConfigMap generator for model configuration
-# CHANGE MODEL HERE: Update the MODEL_NAME value to use a different model
+# NOTE: MODEL_NAME and InferenceService name are configured in the Application CR
+# See fusion-model-serving/gitops/llmops-application.yaml
 configMapGenerator:
   - name: model-config
     literals:
       - MODEL_NAME=ibm-granite/granite-3.2-8b-instruct
     options:
       disableNameSuffixHash: true
-
-

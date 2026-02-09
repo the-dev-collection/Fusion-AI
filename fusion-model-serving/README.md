@@ -18,49 +18,36 @@ The model serving configuration deploys:
 
 ### Deployment
 
-1. **Deploy using the bootstrap application:**
-   ```bash
-   oc apply -f gitops/bootstrap.yaml
-   ```
+Deploy the model serving application:
 
-2. **Or deploy directly:**
-   ```bash
-   oc apply -f gitops/llmops-application.yaml
-   ```
+```bash
+oc apply -f gitops/model-serving.yaml
+```
 
-## Namespace Configuration
+This deploys the LLM model serving infrastructure to your OpenShift cluster. ArgoCD will automatically sync and manage the deployment.
 
-**NEW**: You can now specify the target namespace directly in the Application CR without modifying individual resource files.
+## Configuration
+
+All configuration is done in a single file: [`gitops/model-serving.yaml`](./gitops/model-serving.yaml)
 
 ### Changing the Deployment Namespace
 
-Edit [`gitops/llmops-application.yaml`](./gitops/llmops-application.yaml) and change the `spec.destination.namespace` field:
-
-```yaml
-spec:
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: your-custom-namespace  # Change this to your desired namespace
-```
-
-**Default namespace**: `krishi-rakshak-ds`
-
-For detailed information about namespace configuration, see the [Namespace Configuration Guide](./gitops/NAMESPACE_CONFIGURATION.md).
+Edit `spec.destination.namespace` in [`gitops/model-serving.yaml`](./gitops/model-serving.yaml) (default: `krishi-rakshak-ds`)
 
 ## Architecture
 
 ```
 fusion-model-serving/
 ├── gitops/
-│   ├── bootstrap.yaml                    # Bootstrap Application CR
-│   ├── llmops-application.yaml          # Main Application CR (configure namespace here)
-│   ├── NAMESPACE_CONFIGURATION.md       # Detailed namespace configuration guide
+│   ├── model-serving.yaml               # Main Application CR (configure here)
 │   └── models/
 │       ├── kustomization.yaml           # Kustomize configuration
 │       ├── kserve-model-serving.yaml    # InferenceService definition
 │       ├── rbac.yaml                    # RBAC resources
 │       ├── inferenceservice-config.yaml # ConfigMap
 │       └── missing-crds.yaml            # Optional CRD definitions
+├── scripts/
+│   └── expose-model.sh                  # Script to expose models externally
 └── docs/
     └── ModelServingGuide.md             # Detailed deployment guide
 ```
@@ -75,45 +62,121 @@ The default configuration deploys the **IBM Granite 3.2 8B Instruct** model:
 
 ### Customizing the Model
 
-**NEW**: You can now change the model by editing a single location in [`gitops/models/kustomization.yaml`](./gitops/models/kustomization.yaml):
+Edit [`gitops/model-serving.yaml`](./gitops/model-serving.yaml) to configure your model:
 
 ```yaml
-# ConfigMap generator for model configuration
-# CHANGE MODEL HERE: Update the MODEL_NAME value to use a different model
-configMapGenerator:
-  - name: model-config
-    literals:
-      - MODEL_NAME=ibm-granite/granite-3.2-8b-instruct  # Change this to your desired Hugging Face model
-    options:
-      disableNameSuffixHash: true
+kustomize:
+  patches:
+    # 1. Set your Hugging Face model
+    - target:
+        kind: ConfigMap
+        name: model-config
+      patch: |-
+        - op: replace
+          path: /data/MODEL_NAME
+          value: meta-llama/Meta-Llama-3.1-8B-Instruct  # ← Change this
+    
+    # 2. Set InferenceService name (derived from model name)
+    - target:
+        kind: InferenceService
+      patch: |-
+        - op: replace
+          path: /metadata/name
+          value: meta-llama-3-1-8b-instruct  # ← Change this
 ```
 
-**Example**: To use Meta's Llama 3.1 8B model:
-```yaml
-configMapGenerator:
-  - name: model-config
-    literals:
-      - MODEL_NAME=meta-llama/Meta-Llama-3.1-8B-Instruct
-```
+**Name Conversion Rules:**
+- Take the part after "/" in MODEL_NAME
+- Replace dots (.) with dashes (-)
+- Convert to lowercase
 
-The model name is automatically propagated to both the environment variable and command arguments in the InferenceService.
+**Examples:**
+- `ibm-granite/granite-3.2-8b-instruct` → `granite-3-2-8b-instruct`
+- `meta-llama/Meta-Llama-3.1-8B-Instruct` → `meta-llama-3-1-8b-instruct`
+- `mistralai/Mistral-7B-Instruct-v0.2` → `mistral-7b-instruct-v0-2`
+
+**Complete Workflow:**
+```bash
+# 1. Edit model configuration
+vim gitops/model-serving.yaml
+
+# 2. Apply the configuration
+oc apply -f gitops/model-serving.yaml
+
+# 3. Wait for ArgoCD to sync (check ArgoCD UI)
+
+# 4. Expose all models in namespace
+./scripts/expose-model.sh krishi-rakshak-ds
+```
 
 ## Accessing the Model
 
-Once deployed, the model is accessible via the InferenceService endpoint:
+Once deployed, the model is accessible internally within the cluster.
+
+### Exposing Models Externally
+
+Use the provided script to expose models via OpenShift Routes with TLS:
+
+```bash
+# Expose ALL models in a namespace
+./scripts/expose-model.sh krishi-rakshak-ds
+
+# Or expose a specific model
+./scripts/expose-model.sh <inferenceservice-name> <namespace>
+```
+
+### External Access (after exposing)
+
+```bash
+# Get the route URL
+ROUTE_URL=$(oc get route <inferenceservice-name>-external -n <namespace> -o jsonpath='{.spec.host}')
+
+# List available models
+curl -k https://${ROUTE_URL}/v1/models \
+  -H "Authorization: Bearer EMPTY"
+
+# Test with chat completions
+curl -k -X POST https://${ROUTE_URL}/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer EMPTY" \
+  -d '{
+    "model": "ibm-granite/granite-3.2-8b-instruct",
+    "messages": [
+      {"role": "user", "content": "What is AI?"}
+    ],
+    "max_tokens": 100
+  }'
+```
+
+### Internal Access (from within the cluster)
 
 ```bash
 # Get the service URL
-oc get inferenceservice granite-llm -n <your-namespace>
+oc get inferenceservice -n <your-namespace>
 
 # Test the model (from within the cluster)
-curl -X POST http://granite-llm-predictor.<your-namespace>.svc.cluster.local/v1/completions \
+curl -X POST http://<inferenceservice-name>-predictor.<your-namespace>.svc.cluster.local/v1/completions \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer EMPTY" \
   -d '{
     "model": "ibm-granite/granite-3.2-8b-instruct",
     "prompt": "What is AI?",
     "max_tokens": 100
   }'
+```
+
+### Port Forwarding (for local development)
+
+```bash
+# Forward port 8080 from the pod to your local machine
+oc port-forward \
+  pod/$(oc get pod -n <your-namespace> -l app=isvc.<inferenceservice-name>-predictor -o jsonpath='{.items[0].metadata.name}') \
+  8080:8080 \
+  -n <your-namespace>
+
+# Then access via localhost
+curl http://localhost:8080/v1/models \
+  -H "Authorization: Bearer EMPTY"
 ```
 
 ## Monitoring
@@ -169,36 +232,9 @@ oc get application llmops-models -n openshift-gitops
 
 ## Advanced Configuration
 
-### Multiple Model Deployments
-
-To deploy multiple models to different namespaces, create additional Application CRs:
-
-```yaml
-# File: gitops/llmops-application-prod.yaml
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: llmops-models-prod
-  namespace: openshift-gitops
-spec:
-  source:
-    repoURL: https://github.com/the-dev-collection/Fusion-AI.git
-    targetRevision: main
-    path: fusion-model-serving/gitops/models
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: production-models  # Different namespace
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
-      - CreateNamespace=true
-```
-
 ### GPU Memory Optimization
 
-Adjust GPU memory utilization in [`kserve-model-serving.yaml`](./gitops/models/kserve-model-serving.yaml):
+Adjust GPU memory utilization in [`gitops/models/kserve-model-serving.yaml`](./gitops/models/kserve-model-serving.yaml):
 
 ```yaml
 args:
@@ -208,7 +244,6 @@ args:
 
 ## Documentation
 
-- [Namespace Configuration Guide](./gitops/NAMESPACE_CONFIGURATION.md) - Detailed guide on configuring namespaces
 - [Model Serving Guide](./docs/ModelServingGuide.md) - Comprehensive deployment and configuration guide
 - [Fusion AI Documentation](../README.md) - Main project documentation
 
