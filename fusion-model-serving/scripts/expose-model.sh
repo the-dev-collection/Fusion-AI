@@ -14,7 +14,7 @@ RED='\033[0;31m'
 NC='\033[0m'
 
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║         Expose Models - External Access Tool              ║${NC}"
+echo -e "${BLUE}║         Expose Models - External Access                    ║${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 

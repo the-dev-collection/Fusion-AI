@@ -1,0 +1,65 @@
+apiVersion: datasciencecluster.opendatahub.io/v1
+kind: DataScienceCluster
+metadata:
+  name: default-dsc
+  namespace: redhat-ods-operator
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  components:
+
+    dashboard:
+      managementState: Managed
+
+    workbenches:
+      managementState: Managed
+      workbenchNamespace: rhods-notebooks
+
+    datasciencepipelines:
+      managementState: Managed
+
+    trainingoperator:
+      managementState: Managed
+
+    ray:
+      managementState: Managed
+
+    codeflare:
+      managementState: Removed
+
+    modelmeshserving:
+      managementState: Removed
+
+    kueue:
+      managementState: Removed
+      defaultClusterQueueName: default
+      defaultLocalQueueName: default
+
+    modelregistry:
+      registriesNamespace: rhoai-model-registries
+
+    kserve:
+      managementState: Managed
+      defaultDeploymentMode: RawDeployment
+      rawDeploymentServiceConfig: Headless
+
+      nim:
+        managementState: Managed
+
+      serving:
+        managementState: Removed
+        name: knative-serving
+        ingressGateway:
+          certificate:
+            type: OpenshiftDefaultIngress
+
+    trustyai:
+      managementState: Removed
+      eval:
+        lmeval:
+          permitCodeExecution: deny
+          permitOnline: deny
+
+    feastoperator: {}
+
+    llamastackoperator: {}

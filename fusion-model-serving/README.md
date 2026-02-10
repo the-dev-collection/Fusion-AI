@@ -160,7 +160,7 @@ curl -X POST http://<inferenceservice-name>-predictor.<your-namespace>.svc.clust
   -H "Authorization: Bearer EMPTY" \
   -d '{
     "model": "ibm-granite/granite-3.2-8b-instruct",
-    "prompt": "What is AI?",
+    "prompt": "What is Redhat openshift AI?",
     "max_tokens": 100
   }'
 ```
