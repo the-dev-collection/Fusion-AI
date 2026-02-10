@@ -10,6 +10,7 @@ spec:
   template:
     spec:
       restartPolicy: Never
+      serviceAccountName: rhoai-wait-sa
       containers:
         - name: wait
           image: registry.redhat.io/openshift4/ose-cli

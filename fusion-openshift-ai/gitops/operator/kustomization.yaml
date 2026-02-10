@@ -5,5 +5,6 @@ namespace: redhat-ods-operator
 
 resources:
   - operator.yaml
+  - rhoai-wait-rbac.yaml
   - wait-for-rhoai-ready.yaml
   - dsc.yaml
