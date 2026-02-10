@@ -7,32 +7,30 @@ metadata:
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
+kind: ClusterRole
 metadata:
-  name: rhoai-wait-role
-  namespace: redhat-ods-operator
+  name: rhoai-wait-clusterrole
 rules:
-  # Allow the job to read ClusterServiceVersions (CSV)
+  # Allow reading ClusterServiceVersions (CSV)
   - apiGroups: ["operators.coreos.com"]
     resources: ["clusterserviceversions"]
     verbs: ["get", "list", "watch"]
 
-  # Allow the job to read DSCInitialization CR
+  # Allow reading DSCInitialization (cluster-scoped)
   - apiGroups: ["dscinitialization.opendatahub.io"]
     resources: ["dscinitializations"]
     verbs: ["get", "list", "watch"]
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
+kind: ClusterRoleBinding
 metadata:
-  name: rhoai-wait-rolebinding
-  namespace: redhat-ods-operator
+  name: rhoai-wait-clusterrolebinding
 subjects:
   - kind: ServiceAccount
     name: rhoai-wait-sa
     namespace: redhat-ods-operator
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: rhoai-wait-role
+  kind: ClusterRole
+  name: rhoai-wait-clusterrole
