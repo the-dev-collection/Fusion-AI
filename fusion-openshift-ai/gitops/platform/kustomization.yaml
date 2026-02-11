@@ -4,4 +4,8 @@ kind: Kustomization
 namespace: openshift-gitops
 
 patches:
-  - path: argocd-health-patch.yaml
+  - target:
+      kind: ConfigMap
+      name: argocd-cm
+      namespace: openshift-gitops
+    path: argocd-health-patch.yaml
