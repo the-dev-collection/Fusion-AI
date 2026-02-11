@@ -1,4 +1,4 @@
-- op: add
+- op: replace
   path: /data/resource.customizations.health.operators.coreos.com_ClusterServiceVersion
   value: |
     hs = {}
@@ -11,7 +11,7 @@
     hs.message = "Waiting for Operator CSV to reach Succeeded"
     return hs
 
-- op: add
+- op: replace
   path: /data/resource.customizations.health.dscinitialization.opendatahub.io_DSCInitialization
   value: |
     hs = {}
@@ -24,15 +24,15 @@
     hs.message = "Waiting for DSCInitialization to reach Ready"
     return hs
 
-- op: add
+- op: replace
   path: /data/resource.customizations.health.datasciencecluster.opendatahub.io_DataScienceCluster
   value: |
     hs = {}
     if obj.status ~= nil and obj.status.phase == "Ready" then
       hs.status = "Healthy"
-      hs.message = "DSC is Ready"
+      hs.message = "DSC Ready"
       return hs
     end
     hs.status = "Progressing"
-    hs.message = "Waiting for DataScienceCluster to reach Ready"
+    hs.message = "Waiting for DSC Ready"
     return hs
