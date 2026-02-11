@@ -10,5 +10,5 @@ namespace: openshift-gitops
 #       namespace: openshift-gitops
 #     path: argocd-health-patch.yaml
 
-patchesStrategicMerge:
+patches:
   - argocd-health-patch.yaml
