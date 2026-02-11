@@ -11,4 +11,10 @@ namespace: openshift-gitops
 #     path: argocd-health-patch.yaml
 
 patches:
-  - argocd-health-patch.yaml
+  - target:
+      group: argoproj.io
+      version: v1beta1
+      kind: ArgoCD
+      name: openshift-gitops
+      namespace: openshift-gitops
+    path: argocd-health-patch.yaml
