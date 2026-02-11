@@ -1,36 +1,36 @@
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: rhoai-wait-sa
-  namespace: redhat-ods-operator
+# ---
+# apiVersion: v1
+# kind: ServiceAccount
+# metadata:
+#   name: rhoai-wait-sa
+#   namespace: redhat-ods-operator
 
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: rhoai-wait-clusterrole
-rules:
-  # Allow reading ClusterServiceVersions (CSV)
-  - apiGroups: ["operators.coreos.com"]
-    resources: ["clusterserviceversions"]
-    verbs: ["get", "list", "watch"]
+# ---
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: ClusterRole
+# metadata:
+#   name: rhoai-wait-clusterrole
+# rules:
+#   # Allow reading ClusterServiceVersions (CSV)
+#   - apiGroups: ["operators.coreos.com"]
+#     resources: ["clusterserviceversions"]
+#     verbs: ["get", "list", "watch"]
 
-  # Allow reading DSCInitialization (cluster-scoped)
-  - apiGroups: ["dscinitialization.opendatahub.io"]
-    resources: ["dscinitializations"]
-    verbs: ["get", "list", "watch"]
+#   # Allow reading DSCInitialization (cluster-scoped)
+#   - apiGroups: ["dscinitialization.opendatahub.io"]
+#     resources: ["dscinitializations"]
+#     verbs: ["get", "list", "watch"]
 
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: rhoai-wait-clusterrolebinding
-subjects:
-  - kind: ServiceAccount
-    name: rhoai-wait-sa
-    namespace: redhat-ods-operator
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: rhoai-wait-clusterrole
+# ---
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: ClusterRoleBinding
+# metadata:
+#   name: rhoai-wait-clusterrolebinding
+# subjects:
+#   - kind: ServiceAccount
+#     name: rhoai-wait-sa
+#     namespace: redhat-ods-operator
+# roleRef:
+#   apiGroup: rbac.authorization.k8s.io
+#   kind: ClusterRole
+#   name: rhoai-wait-clusterrole
