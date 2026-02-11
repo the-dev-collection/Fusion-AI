@@ -1,48 +1,94 @@
-- op: replace
-  path: /data/resource.customizations.health.operators.coreos.com_ClusterServiceVersion
-  value: |
-    hs = {}
-    if obj.status ~= nil and obj.status.phase == "Succeeded" then
-      hs.status = "Healthy"
-      hs.message = "CSV is Succeeded"
-      return hs
-    end
-    hs.status = "Progressing"
-    hs.message = "Waiting for Operator CSV to reach Succeeded"
-    return hs
+# - op: replace
+#   path: /data/resource.customizations.health.operators.coreos.com_ClusterServiceVersion
+#   value: |
+#     hs = {}
+#     if obj.status ~= nil and obj.status.phase == "Succeeded" then
+#       hs.status = "Healthy"
+#       hs.message = "CSV is Succeeded"
+#       return hs
+#     end
+#     hs.status = "Progressing"
+#     hs.message = "Waiting for Operator CSV to reach Succeeded"
+#     return hs
 
-- op: replace
-  path: /data/resource.customizations.health.dscinitialization.opendatahub.io_DSCInitialization
-  value: |
-    hs = {}
-    if obj.status ~= nil and obj.status.phase == "Ready" then
-      hs.status = "Healthy"
-      hs.message = "DSCI is Ready"
-      return hs
-    end
-    hs.status = "Progressing"
-    hs.message = "Waiting for DSCInitialization to reach Ready"
-    return hs
+# - op: replace
+#   path: /data/resource.customizations.health.dscinitialization.opendatahub.io_DSCInitialization
+#   value: |
+#     hs = {}
+#     if obj.status ~= nil and obj.status.phase == "Ready" then
+#       hs.status = "Healthy"
+#       hs.message = "DSCI is Ready"
+#       return hs
+#     end
+#     hs.status = "Progressing"
+#     hs.message = "Waiting for DSCInitialization to reach Ready"
+#     return hs
 
-- op: replace
-  path: /data/resource.customizations.health.datasciencecluster.opendatahub.io_DataScienceCluster
-  value: |
-    hs = {}
+# - op: replace
+#   path: /data/resource.customizations.health.datasciencecluster.opendatahub.io_DataScienceCluster
+#   value: |
+#     hs = {}
 
-    if obj.status ~= nil and obj.status.phase ~= nil then
-      if obj.status.phase == "Ready" then
-        hs.status = "Healthy"
-        hs.message = "DSC is Ready"
-        return hs
-      end
+#     if obj.status ~= nil and obj.status.phase ~= nil then
+#       if obj.status.phase == "Ready" then
+#         hs.status = "Healthy"
+#         hs.message = "DSC is Ready"
+#         return hs
+#       end
 
-      if obj.status.phase == "Not Ready" then
+#       if obj.status.phase == "Not Ready" then
+#         hs.status = "Progressing"
+#         hs.message = "DSC is Not Ready"
+#         return hs
+#       end
+#     end
+
+#     hs.status = "Progressing"
+#     hs.message = "Waiting for DSC phase"
+#     return hs
+
+apiVersion: argoproj.io/v1beta1
+kind: ArgoCD
+metadata:
+  name: openshift-gitops
+  namespace: openshift-gitops
+spec:
+  resourceHealthChecks:
+    - group: operators.coreos.com
+      kind: ClusterServiceVersion
+      check: |-
+        hs = {}
+        if obj.status ~= nil and obj.status.phase == "Succeeded" then
+          hs.status = "Healthy"
+          hs.message = "CSV Succeeded"
+          return hs
+        end
         hs.status = "Progressing"
-        hs.message = "DSC is Not Ready"
+        hs.message = "Waiting for CSV"
         return hs
-      end
-    end
 
-    hs.status = "Progressing"
-    hs.message = "Waiting for DSC phase"
-    return hs
+    - group: dscinitialization.opendatahub.io
+      kind: DSCInitialization
+      check: |-
+        hs = {}
+        if obj.status ~= nil and obj.status.phase == "Ready" then
+          hs.status = "Healthy"
+          hs.message = "DSCI Ready"
+          return hs
+        end
+        hs.status = "Progressing"
+        hs.message = "Waiting for DSCI"
+        return hs
+
+    - group: datasciencecluster.opendatahub.io
+      kind: DataScienceCluster
+      check: |-
+        hs = {}
+        if obj.status ~= nil and obj.status.phase == "Ready" then
+          hs.status = "Healthy"
+          hs.message = "DSC Ready"
+          return hs
+        end
+        hs.status = "Progressing"
+        hs.message = "DSC Not Ready"
+        return hs
