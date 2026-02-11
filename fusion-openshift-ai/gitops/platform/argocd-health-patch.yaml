@@ -28,11 +28,21 @@
   path: /data/resource.customizations.health.datasciencecluster.opendatahub.io_DataScienceCluster
   value: |
     hs = {}
-    if obj.status ~= nil and obj.status.phase == "Ready" then
-      hs.status = "Healthy"
-      hs.message = "DSC Ready"
-      return hs
+
+    if obj.status ~= nil and obj.status.phase ~= nil then
+      if obj.status.phase == "Ready" then
+        hs.status = "Healthy"
+        hs.message = "DSC is Ready"
+        return hs
+      end
+
+      if obj.status.phase == "Not Ready" then
+        hs.status = "Progressing"
+        hs.message = "DSC is Not Ready"
+        return hs
+      end
     end
+
     hs.status = "Progressing"
-    hs.message = "Waiting for DSC Ready"
+    hs.message = "Waiting for DSC phase"
     return hs
