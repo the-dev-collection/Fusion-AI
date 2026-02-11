@@ -3,5 +3,5 @@ kind: Kustomization
 
 namespace: openshift-gitops
 
-patchesStrategicMerge:
-  - argocd-health-patch.yaml
+patches:
+  - path: argocd-health-patch.yaml
