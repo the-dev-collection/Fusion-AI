@@ -1,17 +1,17 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: fusion-rhoai-operator
+  name: rhoai-install
   namespace: openshift-gitops
-  finalizers:
-    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   project: default
 
   source:
     repoURL: https://github.com/the-dev-collection/Fusion-AI.git
     targetRevision: main
-    path: fusion-openshift-ai/gitops/operator
+    path: fusion-openshift-ai/gitops/rhoai
 
   destination:
     server: https://kubernetes.default.svc
@@ -32,12 +32,12 @@ spec:
       jsonPointers:
         - /status
 
-    - group: datasciencecluster.opendatahub.io
-      kind: DataScienceCluster
+    - group: dscinitialization.opendatahub.io
+      kind: DSCInitialization
       jsonPointers:
         - /status
 
-    - group: dscinitialization.opendatahub.io
-      kind: DSCInitialization
+    - group: datasciencecluster.opendatahub.io
+      kind: DataScienceCluster
       jsonPointers:
         - /status

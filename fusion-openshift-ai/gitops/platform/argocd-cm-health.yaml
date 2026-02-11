@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cm
+  namespace: openshift-gitops
+data:
+  resource.customizations.health.operators.coreos.com_ClusterServiceVersion: |
+    hs = {}
+    if obj.status ~= nil and obj.status.phase == "Succeeded" then
+      hs.status = "Healthy"
+      hs.message = "CSV is Succeeded"
+      return hs
+    end
+    hs.status = "Progressing"
+    hs.message = "Waiting for CSV"
+    return hs
+
+  resource.customizations.health.dscinitialization.opendatahub.io_DSCInitialization: |
+    hs = {}
+    if obj.status ~= nil and obj.status.phase == "Ready" then
+      hs.status = "Healthy"
+      hs.message = "DSCI is Ready"
+      return hs
+    end
+    hs.status = "Progressing"
+    hs.message = "Waiting for DSCI"
+    return hs
+
+  resource.customizations.health.datasciencecluster.opendatahub.io_DataScienceCluster: |
+    hs = {}
+    if obj.status ~= nil and obj.status.phase == "Ready" then
+      hs.status = "Healthy"
+      hs.message = "DSC is Ready"
+      return hs
+    end
+    hs.status = "Progressing"
+    hs.message = "Waiting for DSC"
+    return hs
