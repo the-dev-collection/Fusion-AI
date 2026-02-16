@@ -30,9 +30,19 @@ This deploys the LLM model serving infrastructure to your OpenShift cluster. Arg
 
 All configuration is done in a single file: [`gitops/model-serving.yaml`](./gitops/model-serving.yaml)
 
+### GitOps Customization - Single Point of Control
+
+The configuration uses **GitOps best practices** where you only edit the Application CR and all changes propagate automatically to all resources via Kustomize patches.
+
+**What You Can Customize:**
+1. **Application name and labels** - Automatically applied to all resources
+2. **Model configuration** - HuggingFace model path
+3. **InferenceService settings** - Name, labels, GPU/memory resources
+4. **Deployment namespace** - Target namespace for deployment
+
 ### Changing the Deployment Namespace
 
-Edit `spec.destination.namespace` in [`gitops/model-serving.yaml`](./gitops/model-serving.yaml) (default: `krishi-rakshak-ds`)
+Edit `spec.destination.namespace` in [`gitops/model-serving.yaml`](./gitops/model-serving.yaml) (default: `test-model-serving`)
 
 ## Architecture
 
@@ -62,12 +72,23 @@ The default configuration deploys the **IBM Granite 3.2 8B Instruct** model:
 
 ### Customizing the Model
 
-Edit [`gitops/model-serving.yaml`](./gitops/model-serving.yaml) to configure your model:
+Edit [`gitops/model-serving.yaml`](./gitops/model-serving.yaml) to configure your model. The file uses **only 3 consolidated patches** for clean configuration:
 
 ```yaml
 kustomize:
   patches:
-    # 1. Set your Hugging Face model
+    # Patch 1: Override commonLabels (propagates to ALL resources)
+    - target:
+        kind: Kustomization
+      patch: |-
+        - op: replace
+          path: /commonLabels/app.kubernetes.io~1name
+          value: my-ai-models  # ← Change this
+        - op: replace
+          path: /commonLabels/validated-patterns.io~1pattern
+          value: my-ai-platform  # ← Change this
+    
+    # Patch 2: Set your HuggingFace model
     - target:
         kind: ConfigMap
         name: model-config
@@ -76,13 +97,28 @@ kustomize:
           path: /data/MODEL_NAME
           value: meta-llama/Meta-Llama-3.1-8B-Instruct  # ← Change this
     
-    # 2. Set InferenceService name (derived from model name)
+    # Patch 3: Configure InferenceService (name, labels, resources)
     - target:
         kind: InferenceService
       patch: |-
         - op: replace
           path: /metadata/name
           value: meta-llama-3-1-8b-instruct  # ← Change this
+        - op: replace
+          path: /metadata/labels/model
+          value: llama  # ← Change this
+        - op: replace
+          path: /spec/predictor/containers/0/resources/limits/nvidia.com~1gpu
+          value: "2"  # ← Change GPU count
+        - op: replace
+          path: /spec/predictor/containers/0/resources/limits/memory
+          value: "32Gi"  # ← Change memory
+        - op: replace
+          path: /spec/predictor/containers/0/resources/requests/nvidia.com~1gpu
+          value: "2"
+        - op: replace
+          path: /spec/predictor/containers/0/resources/requests/memory
+          value: "32Gi"
 ```
 
 **Name Conversion Rules:**
@@ -97,17 +133,32 @@ kustomize:
 
 **Complete Workflow:**
 ```bash
-# 1. Edit model configuration
+# 1. Edit model configuration (only file you need to change!)
 vim gitops/model-serving.yaml
 
 # 2. Apply the configuration
 oc apply -f gitops/model-serving.yaml
 
 # 3. Wait for ArgoCD to sync (check ArgoCD UI)
+# ArgoCD will automatically apply all patches and update all resources
 
 # 4. Expose all models in namespace
-./scripts/expose-model.sh krishi-rakshak-ds
+./scripts/expose-model.sh test-model-serving
 ```
+
+### How Label Propagation Works
+
+The configuration uses Kustomize's `commonLabels` feature with patches:
+
+1. **Base labels** are defined in [`gitops/models/kustomization.yaml`](./gitops/models/kustomization.yaml)
+2. **Application CR patches** override these labels in [`gitops/model-serving.yaml`](./gitops/model-serving.yaml)
+3. **Kustomize automatically applies** the overridden labels to ALL resources:
+   - Role and RoleBinding (RBAC)
+   - ConfigMaps
+   - InferenceService
+   - All other Kubernetes resources
+
+**Result:** Change labels once in the Application CR, and they propagate everywhere automatically!
 
 ## Accessing the Model
 
@@ -232,15 +283,41 @@ oc get application llmops-models -n openshift-gitops
 
 ## Advanced Configuration
 
+### Resource Customization
+
+All resource configurations can be customized via patches in [`gitops/model-serving.yaml`](./gitops/model-serving.yaml):
+
+**GPU and Memory:**
+```yaml
+- op: replace
+  path: /spec/predictor/containers/0/resources/limits/nvidia.com~1gpu
+  value: "2"  # Number of GPUs
+- op: replace
+  path: /spec/predictor/containers/0/resources/limits/memory
+  value: "32Gi"  # Memory allocation
+```
+
+**CPU Resources:**
+```yaml
+- op: add
+  path: /spec/predictor/containers/0/resources/limits/cpu
+  value: "8"
+- op: add
+  path: /spec/predictor/containers/0/resources/requests/cpu
+  value: "4"
+```
+
 ### GPU Memory Optimization
 
-Adjust GPU memory utilization in [`gitops/models/kserve-model-serving.yaml`](./gitops/models/kserve-model-serving.yaml):
+To adjust vLLM GPU memory utilization, you would need to modify [`gitops/models/kserve-model-serving.yaml`](./gitops/models/kserve-model-serving.yaml) directly:
 
 ```yaml
 args:
 - --gpu-memory-utilization
 - "0.75"  # Adjust between 0.5 and 0.95
 ```
+
+**Note:** For true GitOps, consider adding this as a ConfigMap value that can be patched from the Application CR.
 
 ## Documentation
 

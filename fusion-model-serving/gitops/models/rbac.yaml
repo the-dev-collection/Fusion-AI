@@ -1,10 +1,12 @@
 # RBAC for ArgoCD to deploy KServe InferenceServices
 # Namespace will be set by Kustomize from Application CR's destination.namespace
+# Labels will be automatically added by commonLabels in kustomization.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: argocd-manager
   # Namespace will be set by Kustomize from Application CR's destination.namespace
+  # Labels will be automatically added by commonLabels in kustomization.yaml
 rules:
 - apiGroups:
   - serving.kserve.io
@@ -39,6 +41,7 @@ kind: RoleBinding
 metadata:
   name: argocd-manager
   # Namespace will be set by Kustomize from Application CR's destination.namespace
+  # Labels will be automatically added by commonLabels in kustomization.yaml
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role

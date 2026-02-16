@@ -1,11 +1,18 @@
 ---
-# LLM Model Serving Application
+# ============================================================================
+# LLM Model Serving Application - GitOps Configuration
+# ============================================================================
 # Deploys LLM model serving on OpenShift AI with KServe
-# 
-# CUSTOMIZE YOUR MODEL HERE:
-# 1. Change MODEL_NAME to any Hugging Face model
-# 2. Change inferenceservice_name (derived from model name)
-# 3. Change namespace if needed
+#
+# QUICK START - Change these 5 values:
+# 1. Application name (line 13) - Your app identifier
+# 2. Labels (lines 50-51) - Match application name
+# 3. Model name (line 59) - HuggingFace model path
+# 4. Service name (line 65) - Kubernetes-compatible name
+# 5. Namespace (line 92) - Target deployment namespace
+#
+# All other resources inherit labels automatically via commonLabels!
+# ============================================================================
 #
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -25,12 +32,13 @@ spec:
     path: fusion-model-serving/gitops/models
     kustomize:
       # ============================================================================
-      # CONFIGURE YOUR MODEL HERE
+      # CUSTOMIZATION SECTION - Only 3 patches needed!
       # ============================================================================
-      # 1. MODEL_NAME: The Hugging Face model to deploy
-      # 2. InferenceService name: Kubernetes-compatible name derived from model
+      # Patch 1: Labels (propagate to all resources)
+      # Patch 2: Model name (HuggingFace model path)
+      # Patch 3: InferenceService (name, labels, GPU/memory resources)
       #
-      # Name Conversion Rules:
+      # InferenceService Name Conversion Rules:
       #   - Take the part after "/" in MODEL_NAME
       #   - Replace dots (.) with dashes (-)
       #   - Convert to lowercase
@@ -41,7 +49,19 @@ spec:
       #   mistralai/Mistral-7B-Instruct-v0.2 → mistral-7b-instruct-v0-2
       # ============================================================================
       patches:
-        # Patch 1: Set the MODEL_NAME in ConfigMap
+        # Patch 1: Override commonLabels in Kustomization
+        # This automatically applies to ALL resources
+        - target:
+            kind: Kustomization
+          patch: |-
+            - op: replace
+              path: /commonLabels/app.kubernetes.io~1name
+              value: llmops-models
+            - op: replace
+              path: /commonLabels/validated-patterns.io~1pattern
+              value: llmops-platform
+        
+        # Patch 2: Set the MODEL_NAME in ConfigMap
         - target:
             kind: ConfigMap
             name: model-config
@@ -50,18 +70,34 @@ spec:
               path: /data/MODEL_NAME
               value: ibm-granite/granite-3.2-8b-instruct
         
-        # Patch 2: Set the InferenceService name
+        # Patch 3: Configure InferenceService (name, labels, resources)
+        # All InferenceService customizations in ONE patch
         - target:
             kind: InferenceService
           patch: |-
             - op: replace
               path: /metadata/name
               value: granite-3-2-8b-instruct
-  
+            - op: replace
+              path: /metadata/labels/model
+              value: granite
+            - op: replace
+              path: /spec/predictor/containers/0/resources/limits/nvidia.com~1gpu
+              value: "1"
+            - op: replace
+              path: /spec/predictor/containers/0/resources/limits/memory
+              value: "16Gi"
+            - op: replace
+              path: /spec/predictor/containers/0/resources/requests/nvidia.com~1gpu
+              value: "1"
+            - op: replace
+              path: /spec/predictor/containers/0/resources/requests/memory
+              value: "16Gi"
+
   destination:
     server: https://kubernetes.default.svc
     # CUSTOMIZE THIS: Change the namespace to your desired target namespace
-    namespace: krishi-rakshak-ds
+    namespace: test-model-serving
   
   syncPolicy:
     automated:
@@ -70,4 +106,3 @@ spec:
     syncOptions:
       - CreateNamespace=true
 
-# Made with Bob

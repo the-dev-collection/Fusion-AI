@@ -5,9 +5,7 @@ kind: ConfigMap
 metadata:
   name: inferenceservice-config
   # Namespace will be set by Kustomize from Application CR's destination.namespace
-  labels:
-    app.kubernetes.io/name: llmops-models
-    validated-patterns.io/pattern: llmops-platform
+  # Labels will be automatically added by commonLabels in kustomization.yaml
   annotations:
     # Ensure this ConfigMap is created before InferenceService (sync wave -1)
     argocd.argoproj.io/sync-wave: "-1"

@@ -11,13 +11,15 @@ resources:
   - missing-crds.yaml
   - kserve-model-serving.yaml
 
+# Labels are dynamically set from Application CR via Kustomize patches
+# See fusion-model-serving/gitops/model-serving.yaml for label configuration
 commonLabels:
   app.kubernetes.io/name: llmops-models
   validated-patterns.io/pattern: llmops-platform
 
 # ConfigMap generator for model configuration
 # NOTE: MODEL_NAME and InferenceService name are configured in the Application CR
-# See fusion-model-serving/gitops/llmops-application.yaml
+# See fusion-model-serving/gitops/model-serving.yaml
 configMapGenerator:
   - name: model-config
     literals:
