@@ -27,7 +27,7 @@ spec:
       registriesNamespace: rhoai-model-registries
 
     feastoperator:
-      managementState: Managed
+      managementState: Removed
 
     trustyai:
       managementState: Managed
