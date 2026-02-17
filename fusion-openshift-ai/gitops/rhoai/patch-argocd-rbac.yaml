@@ -5,7 +5,9 @@ metadata:
   name: patch-argocd-sa
   namespace: openshift-gitops
   annotations:
+    argocd.argoproj.io/hook: PreSync
     argocd.argoproj.io/sync-wave: "-10"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -13,7 +15,9 @@ kind: ClusterRole
 metadata:
   name: patch-argocd-clusterrole
   annotations:
+    argocd.argoproj.io/hook: PreSync
     argocd.argoproj.io/sync-wave: "-10"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
 rules:
   # Allow patching ArgoCD resources
   - apiGroups: ["argoproj.io"]
@@ -26,7 +30,9 @@ kind: ClusterRoleBinding
 metadata:
   name: patch-argocd-clusterrolebinding
   annotations:
+    argocd.argoproj.io/hook: PreSync
     argocd.argoproj.io/sync-wave: "-10"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
 subjects:
   - kind: ServiceAccount
     name: patch-argocd-sa
