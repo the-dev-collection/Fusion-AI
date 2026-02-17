@@ -8,58 +8,51 @@ metadata:
 spec:
   components:
 
-    dashboard:
-      managementState: Managed
-
-    workbenches:
-      managementState: Managed
-      workbenchNamespace: rhods-notebooks
-
-    datasciencepipelines:
-      managementState: Managed
-
-    trainingoperator:
-      managementState: Managed
-
-    ray:
-      managementState: Managed
-
-    codeflare:
-      managementState: Removed
-
-    modelmeshserving:
-      managementState: Removed
-
-    kueue:
-      managementState: Removed
-      defaultClusterQueueName: default
-      defaultLocalQueueName: default
-
-    modelregistry:
-      registriesNamespace: rhoai-model-registries
-
     kserve:
       managementState: Managed
-      defaultDeploymentMode: RawDeployment
-      rawDeploymentServiceConfig: Headless
-
       nim:
         managementState: Managed
+      rawDeploymentServiceConfig: Headless
 
-      serving:
-        managementState: Removed
-        name: knative-serving
-        ingressGateway:
-          certificate:
-            type: OpenshiftDefaultIngress
+    modelregistry:
+      managementState: Managed
+      registriesNamespace: rhoai-model-registries
+
+    feastoperator:
+      managementState: Managed
 
     trustyai:
-      managementState: Removed
+      managementState: Managed
       eval:
         lmeval:
           permitCodeExecution: deny
           permitOnline: deny
 
-    feastoperator: {}
+    aipipelines:
+      managementState: Managed
 
-    llamastackoperator: {}
+    ray:
+      managementState: Managed
+
+    kueue:
+      defaultClusterQueueName: default
+      defaultLocalQueueName: default
+      managementState: Removed
+
+    workbenches:
+      managementState: Managed
+      workbenchNamespace: rhods-notebooks
+
+    mlflowoperator:
+      managementState: Removed
+
+    dashboard:
+      managementState: Managed
+
+    trainer: {}
+    
+    llamastackoperator:
+      managementState: Removed
+
+    trainingoperator:
+      managementState: Managed
