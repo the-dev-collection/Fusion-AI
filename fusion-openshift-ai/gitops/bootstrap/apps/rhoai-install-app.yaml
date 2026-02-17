@@ -26,18 +26,18 @@ spec:
       - CreateNamespace=true
       - ServerSideApply=true
 
-  ignoreDifferences:
-    - group: operators.coreos.com
-      kind: ClusterServiceVersion
-      jsonPointers:
-        - /status
+  # ignoreDifferences:
+  #   - group: operators.coreos.com
+  #     kind: ClusterServiceVersion
+  #     jsonPointers:
+  #       - /status
 
-    - group: dscinitialization.opendatahub.io
-      kind: DSCInitialization
-      jsonPointers:
-        - /status
+  #   - group: dscinitialization.opendatahub.io
+  #     kind: DSCInitialization
+  #     jsonPointers:
+  #       - /status
 
-    - group: datasciencecluster.opendatahub.io
-      kind: DataScienceCluster
-      jsonPointers:
-        - /status
+  #   - group: datasciencecluster.opendatahub.io
+  #     kind: DataScienceCluster
+  #     jsonPointers:
+  #       - /status
