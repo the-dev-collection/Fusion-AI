@@ -1,64 +1,64 @@
-# apiVersion: batch/v1
-# kind: Job
-# metadata:
-#   name: patch-argocd-healthchecks
-#   namespace: openshift-gitops
-#   annotations:
-#     argocd.argoproj.io/hook: PreSync
-#     argocd.argoproj.io/sync-wave: "-5"
-#     argocd.argoproj.io/hook-delete-policy: HookSucceeded
-# spec:
-#   template:
-#     spec:
-#       serviceAccountName: patch-argocd-sa
-#       restartPolicy: Never
-#       containers:
-#         - name: patch
-#           image: registry.redhat.io/openshift4/ose-cli:latest
-#           command:
-#             - /bin/bash
-#             - -c
-#             - |
-#               echo "Patching ArgoCD resourceHealthChecks..."
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: patch-argocd-healthchecks
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/sync-wave: "-5"
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+spec:
+  template:
+    spec:
+      serviceAccountName: patch-argocd-sa
+      restartPolicy: Never
+      containers:
+        - name: patch
+          image: registry.redhat.io/openshift4/ose-cli:latest
+          command:
+            - /bin/bash
+            - -c
+            - |
+              echo "Patching ArgoCD resourceHealthChecks..."
 
-#               oc patch argocd openshift-gitops \
-#                 -n openshift-gitops \
-#                 --type merge \
-#                 --patch '
-# spec:
-#   resourceHealthChecks:
-#     - group: operators.coreos.com
-#       kind: ClusterServiceVersion
-#       check: |-
-#         hs = {}
-#         if obj.status.phase == "Succeeded" then
-#           hs.status = "Healthy"
-#           return hs
-#         end
-#         hs.status = "Progressing"
-#         return hs
+              oc patch argocd openshift-gitops \
+                -n openshift-gitops \
+                --type merge \
+                --patch '
+spec:
+  resourceHealthChecks:
+    - group: operators.coreos.com
+      kind: ClusterServiceVersion
+      check: |-
+        hs = {}
+        if obj.status.phase == "Succeeded" then
+          hs.status = "Healthy"
+          return hs
+        end
+        hs.status = "Progressing"
+        return hs
 
-#     - group: dscinitialization.opendatahub.io
-#       kind: DSCInitialization
-#       check: |-
-#         hs = {}
-#         if obj.status.phase == "Ready" then
-#           hs.status = "Healthy"
-#           return hs
-#         end
-#         hs.status = "Progressing"
-#         return hs
+    - group: dscinitialization.opendatahub.io
+      kind: DSCInitialization
+      check: |-
+        hs = {}
+        if obj.status.phase == "Ready" then
+          hs.status = "Healthy"
+          return hs
+        end
+        hs.status = "Progressing"
+        return hs
 
-#     - group: datasciencecluster.opendatahub.io
-#       kind: DataScienceCluster
-#       check: |-
-#         hs = {}
-#         if obj.status.phase == "Ready" then
-#           hs.status = "Healthy"
-#           return hs
-#         end
-#         hs.status = "Progressing"
-#         return hs
-# '
+    - group: datasciencecluster.opendatahub.io
+      kind: DataScienceCluster
+      check: |-
+        hs = {}
+        if obj.status.phase == "Ready" then
+          hs.status = "Healthy"
+          return hs
+        end
+        hs.status = "Progressing"
+        return hs
+'
 
-#               echo "Patch applied successfully."
+              echo "Patch applied successfully."
