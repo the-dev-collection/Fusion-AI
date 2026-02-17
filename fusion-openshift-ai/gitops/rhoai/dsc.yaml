@@ -1,4 +1,4 @@
-apiVersion: datasciencecluster.opendatahub.io/v1
+apiVersion: datasciencecluster.opendatahub.io/v2
 kind: DataScienceCluster
 metadata:
   name: default-dsc
@@ -8,11 +8,19 @@ metadata:
 spec:
   components:
 
+    dashboard:
+      managementState: Managed
+
+    workbenches:
+      managementState: Managed
+      workbenchNamespace: rhods-notebooks
+
     kserve:
       managementState: Managed
+      rawDeploymentServiceConfig: Headless
+
       nim:
         managementState: Managed
-      rawDeploymentServiceConfig: Headless
 
     modelregistry:
       managementState: Managed
@@ -34,25 +42,19 @@ spec:
     ray:
       managementState: Managed
 
-    kueue:
-      defaultClusterQueueName: default
-      defaultLocalQueueName: default
-      managementState: Removed
-
-    workbenches:
+    trainingoperator:
       managementState: Managed
-      workbenchNamespace: rhods-notebooks
+
+    trainer:
+      managementState: Removed
 
     mlflowoperator:
       managementState: Removed
 
-    dashboard:
-      managementState: Managed
-
-    trainer: {}
-    
     llamastackoperator:
       managementState: Removed
 
-    trainingoperator:
-      managementState: Managed
+    kueue:
+      managementState: Removed
+      defaultClusterQueueName: default
+      defaultLocalQueueName: default
