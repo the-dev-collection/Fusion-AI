@@ -9,7 +9,7 @@ spec:
   project: default
 
   source:
-    repoURL: https://github.com/the-dev-collection/Fusion-AI.git
+    repoURL: https://github.com/<your-username>/Fusion-AI.git
     targetRevision: main
     path: fusion-openshift-ai/gitops/rhoai
 

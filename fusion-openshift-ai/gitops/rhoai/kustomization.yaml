@@ -3,8 +3,4 @@ kind: Kustomization
 
 resources:
   - operator.yaml
-  - rhoai-wait-rbac.yaml
-  - patch-argocd-rbac.yaml
-  - patch-argocd-health-job.yaml
-  - wait-for-rhoai-ready.yaml
   - dsc.yaml
