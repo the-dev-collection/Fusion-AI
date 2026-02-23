@@ -26,8 +26,6 @@ spec:
       managementState: Managed
       registriesNamespace: model-registry
 
-    feastoperator:
-      managementState: Managed
 
     trustyai:
       managementState: Managed
@@ -51,8 +49,6 @@ spec:
       managementState: Removed
 
 
-    mlmd:
-      managementState: Managed
 
     datasciencepipelines:
       managementState: Managed
