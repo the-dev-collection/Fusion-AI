@@ -8,47 +8,43 @@ metadata:
 
 spec:
   components:
-
-    dashboard:
-      managementState: Managed
-
-    workbenches:
-      managementState: Managed
-      workbenchesNamespace: rhods-notebooks
+    codeflare:
+      managementState: Removed
 
     kserve:
+      defaultDeploymentMode: RawDeployment
       managementState: Managed
-      rawDeploymentServiceConfig: Headless
-      nim:
-        managementState: Managed
+      serving:
+        managementState: Removed
+        name: knative-serving
 
     modelregistry:
-      managementState: Managed
-      registriesNamespace: model-registry
+      registriesNamespace: rhoai-model-registries
 
+    feastoperator: {}
 
     trustyai:
-      managementState: Managed
+      managementState: Removed
 
     ray:
       managementState: Managed
 
-    codeflare:
+    kueue:
+      managementState: Removed
+
+    workbenches:
       managementState: Managed
 
-    kueue:
-      defaultClusterQueueName: default
-      defaultLocalQueueName: default
+    dashboard:
+      managementState: Managed
+
+    modelmeshserving:
+      managementState: Removed
+
+    llamastackoperator: {}
+
+    datasciencepipelines:
       managementState: Managed
 
     trainingoperator:
-      managementState: Managed
-      workbenchesNamespace: rhods-notebooks
-
-    trainer:
-      managementState: Removed
-
-
-
-    datasciencepipelines:
       managementState: Managed
