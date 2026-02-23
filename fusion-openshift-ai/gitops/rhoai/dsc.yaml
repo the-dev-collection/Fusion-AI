@@ -5,6 +5,7 @@ metadata:
   namespace: redhat-ods-operator
   annotations:
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+
 spec:
   components:
 
@@ -17,26 +18,15 @@ spec:
 
     kserve:
       managementState: Managed
-      rawDeploymentServiceConfig: Headless
-
-      nim:
-        managementState: Managed
 
     modelregistry:
       managementState: Managed
-      registriesNamespace: rhoai-model-registries
+      registriesNamespace: model-registry
 
     feastoperator:
-      managementState: Removed
+      managementState: Managed
 
     trustyai:
-      managementState: Managed
-      eval:
-        lmeval:
-          permitCodeExecution: deny
-          permitOnline: deny
-
-    aipipelines:
       managementState: Managed
 
     ray:
@@ -45,16 +35,13 @@ spec:
     trainingoperator:
       managementState: Managed
 
-    trainer:
+    llmoperator:
       managementState: Removed
 
-    mlflowoperator:
+    datasciencepipelines:
       managementState: Removed
 
-    llamastackoperator:
-      managementState: Removed
-
-    kueue:
+    codeflare:
       managementState: Removed
       defaultClusterQueueName: default
       defaultLocalQueueName: default
