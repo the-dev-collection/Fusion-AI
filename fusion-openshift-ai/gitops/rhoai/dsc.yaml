@@ -50,8 +50,6 @@ spec:
     trainer:
       managementState: Removed
 
-    dashboard:
-      managementState: Managed
 
     mlmd:
       managementState: Managed
