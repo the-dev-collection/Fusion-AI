@@ -35,11 +35,11 @@ spec:
         value: "ibm-granite/granite-3.2-8b-instruct"
       # HF_TOKEN is optional — only needed for gated models (e.g., Meta Llama)
       # Uncomment and ensure hf-token-secret exists when deploying gated models
-      # - name: HF_TOKEN
-      #   valueFrom:
-      #     secretKeyRef:
-      #       name: hf-token-secret
-      #       key: token
+      - name: HF_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: hf-token-secret
+            key: token
       - name: HF_HOME
         value: "/tmp/hf_cache"
       - name: VLLM_CACHE_ROOT
