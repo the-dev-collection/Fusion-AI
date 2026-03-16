@@ -1,0 +1,116 @@
+---
+# ============================================================================
+# Llama 3 70B Model Serving Application - GitOps Configuration
+# ============================================================================
+# Example configuration for deploying Meta Llama models that require HuggingFace authentication
+#
+# PREREQUISITES:
+# 1. Accept the Llama model license on HuggingFace: https://huggingface.co/meta-llama/Meta-Llama-3-70B
+# 2. Create HuggingFace token: https://huggingface.co/settings/tokens
+# 3. Create the hf-token-secret (see instructions in hf-token-secret.yaml)
+# 4. Uncomment HF_TOKEN env in kserve-model-serving.yaml
+# 5. Uncomment hf-token-secret.yaml in kustomization.yaml
+#
+# RESOURCE REQUIREMENTS:
+# - Llama 3 70B requires significant GPU memory (typically 2-4 A100 GPUs)
+# - Adjust GPU count and memory based on your cluster capacity
+# - Consider using tensor parallelism for large models
+# ============================================================================
+#
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: llama-3-70b-model
+  namespace: openshift-gitops
+  labels:
+    app.kubernetes.io/name: llama-3-70b-model
+    validated-patterns.io/pattern: llmops-platform
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    # IMPORTANT: Replace <your-username> with your GitHub username after forking the repository
+    repoURL: https://github.com/<your-username>/storage-fusion.git
+    targetRevision: main
+    path: fusion-model-serving/gitops/models
+    kustomize:
+      patches:
+        # Patch 1: Override commonLabels in Kustomization
+        - target:
+            kind: Kustomization
+          patch: |-
+            - op: replace
+              path: /commonLabels/app.kubernetes.io~1name
+              value: llama-3-70b-model
+            - op: replace
+              path: /commonLabels/validated-patterns.io~1pattern
+              value: llmops-platform
+
+        # Patch 2: Configure InferenceService for Llama 3 70B
+        # NOTE: Ensure HF_TOKEN env is uncommented in kserve-model-serving.yaml
+        - target:
+            kind: InferenceService
+          patch: |-
+            - op: replace
+              path: /metadata/name
+              value: meta-llama-3-70b
+            - op: replace
+              path: /metadata/labels/model
+              value: llama
+            - op: replace
+              path: /spec/predictor/containers/0/env/0/value
+              value: meta-llama/Meta-Llama-3-70B
+            - op: replace
+              path: /spec/predictor/containers/0/resources/limits/nvidia.com~1gpu
+              value: "4"
+            - op: replace
+              path: /spec/predictor/containers/0/resources/limits/memory
+              value: "128Gi"
+            - op: replace
+              path: /spec/predictor/containers/0/resources/requests/nvidia.com~1gpu
+              value: "4"
+            - op: replace
+              path: /spec/predictor/containers/0/resources/requests/memory
+              value: "128Gi"
+
+  destination:
+    server: https://kubernetes.default.svc
+    # Deploy to a dedicated namespace for Llama models
+    namespace: llama-model-serving
+
+  # Ignore diff on shared resources
+  ignoreDifferences:
+    - group: rbac.authorization.k8s.io
+      kind: Role
+      name: argocd-manager
+      jsonPointers:
+        - /metadata/annotations/argocd.argoproj.io~1tracking-id
+        - /metadata/labels
+    - group: rbac.authorization.k8s.io
+      kind: RoleBinding
+      name: argocd-manager
+      jsonPointers:
+        - /metadata/annotations/argocd.argoproj.io~1tracking-id
+        - /metadata/labels
+    - group: ""
+      kind: ConfigMap
+      name: inferenceservice-config
+      jsonPointers:
+        - /metadata/annotations/argocd.argoproj.io~1tracking-id
+        - /metadata/labels
+    - group: ""
+      kind: Secret
+      name: hf-token-secret
+      jsonPointers:
+        - /metadata/annotations/argocd.argoproj.io~1tracking-id
+        - /metadata/labels
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+
+# Made with Bob
