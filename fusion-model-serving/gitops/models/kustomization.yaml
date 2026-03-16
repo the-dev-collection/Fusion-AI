@@ -10,7 +10,7 @@ resources:
   - kserve-model-serving.yaml
   # Uncomment the line below when deploying gated models (e.g., Meta Llama)
   # that require HuggingFace authentication
-  # - hf-token-secret.yaml
+  - hf-token-secret.yaml
 
 # Labels are dynamically set from Application CR via Kustomize patches
 # See fusion-model-serving/gitops/model-serving-application.yaml for label configuration
