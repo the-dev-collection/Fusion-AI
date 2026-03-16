@@ -31,7 +31,7 @@ spec:
   project: default
   source:
     # IMPORTANT: Replace <your-username> with your GitHub username after forking the repository
-    repoURL: https://github.com/<your-username>/storage-fusion.git
+    repoURL: https://the-dev-collection/Fusion-AI.git
     targetRevision: main
     path: fusion-model-serving/gitops/models
     kustomize:
@@ -77,7 +77,7 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     # Deploy to a dedicated namespace for Llama models
-    namespace: llama-model-serving
+    namespace: model-serving
 
   # Ignore diff on shared resources
   ignoreDifferences:
