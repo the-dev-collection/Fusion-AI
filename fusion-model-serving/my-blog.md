@@ -1,8 +1,8 @@
-# Deploying LLM on IBM Fusion HCI with llm-d and Red Hat OpenShift AI 3.0
+# Disaggregated LLM Inference on IBM Fusion HCI: Prefill-Decode Separation, KV Cache Efficiency, and Observability
 
 ## Introduction
 
-Getting an LLM to respond is straightforward. Getting it to respond consistently, at scale, with observable performance — that's where most deployments run into trouble.
+Getting an LLM to respond is straightforward. Getting it to respond consistently, at scale, with observable performance, that's where most deployments run into trouble.
 
 Red Hat OpenShift AI 3.0 introduces a new inference architecture built around llm-d, which disaggregates the Prefill and Decode phases of LLM inference into separate, independently-scalable pod pools. Running this stack on IBM Fusion HCI further simplifies GPU, storage, and operator readiness for enterprise AI workloads.
 
@@ -251,7 +251,7 @@ oc delete pod -n redhat-ods-applications -l control-plane=kserve-controller-mana
 
 ### How AuthPolicies Are Created Automatically
 
-Once Kuadrant is running, when you deploy an `LLMInferenceService` the ODH Model Controller automatically creates two `AuthPolicy` objects — one at the Gateway level and one scoped to the HTTPRoute for your specific model. You verify them after deployment:
+Once Kuadrant is running, when you deploy an `LLMInferenceService`, the ODH Model Controller automatically creates two `AuthPolicy` objects, one at the Gateway level and one scoped to the HTTPRoute for your specific model. You verify them after deployment:
 
 ```bash
 oc get authpolicy -A
@@ -412,25 +412,25 @@ The EPP (Endpoint Picker Protocol) Scheduler uses a plugin-based architecture to
 
 **`queue-scorer` (weight 1.0)** - Scores pods based on current queue depth. Lower queue = higher score. Prevents any single pod from becoming a bottleneck.
 
-**`kv-cache-utilization-scorer` (weight 2.0)** - Scores pods based on KV cache prefix matches. If a pod already has the prompt context cached, it gets a higher score. **This is the key differentiator** — the 2.0 weight means cache affinity is prioritized over queue depth for decode requests.
+**`kv-cache-utilization-scorer` (weight 2.0)** - Scores pods based on KV cache prefix matches. If a pod already has the prompt context cached, it gets a higher score. **This is the key differentiator** - the 2.0 weight means cache affinity is prioritized over queue depth for decode requests.
 
 **`max-score-picker`** - Selects the pod with the highest combined score from all scorers. The final routing decision balances queue depth and cache efficiency.
 
-**`pd-profile-handler`** - Manages the scheduling profiles (prefill vs decode) and applies the appropriate plugin chain based on request phase.
+**`pd-profile-handler`** - Manages the scheduling profiles (prefill vs decode) and applies the appropriate plugin chain based on the request phase.
 
 #### Key Configuration Parameters
 
 **`hashBlockSize: 16`** - Controls KV cache prefix matching granularity. The scheduler tracks cached context in 16-token blocks. This allows partial prompt overlaps (shared system prompts, few-shot examples) to still get cache hits. Smaller blocks = finer matching but more overhead; larger blocks = coarser matching but fewer cache hits.
 
 **Scheduling Profile Weights:**
-- **Prefill profile:** `queue-scorer` only (weight 1.0) — prefill is compute-bound with no cache reuse
-- **Decode profile:** `queue-scorer` (weight 1.0) + `kv-cache-utilization-scorer` (weight 2.0) — decode benefits from cache-aware routing
+- **Prefill profile:** `queue-scorer` only (weight 1.0), prefill is compute-bound with no cache reuse
+- **Decode profile:** `queue-scorer` (weight 1.0) + `kv-cache-utilization-scorer` (weight 2.0), decode benefits from cache-aware routing
 
 The 2:1 weight ratio means the scheduler will route to a slightly busier pod if that pod has the matching KV cache. For decode requests, avoiding a cache miss (recomputing full prompt context) outweighs a marginally longer queue.
 
 **`threshold: 0`** - The scheduler considers all healthy pods for every request. In larger deployments, you might raise this to exclude heavily loaded pods.
 
-**`initialDelaySeconds: 300`** - Model loading for an 8B parameter model takes several minutes. The pod needs time to download weights and load them into GPU memory before the health endpoint responds. On IBM Fusion HCI where storage reads happen over the network fabric, 300 seconds provides a safe initialization buffer.
+**`initialDelaySeconds: 300`** - Model loading for an 8B parameter model takes several minutes. The pod needs time to download weights and load them into GPU memory before the health endpoint responds. On IBM Fusion HCI, where storage reads happen over the network fabric, 300 seconds provides a safe initialization buffer.
 
 ---
 
@@ -522,7 +522,7 @@ Example response:
 
 Two targeted test scenarios were executed to validate Prefill-Decode separation and KV cache efficiency. All metrics were collected via Prometheus using the OpenShift monitoring stack.
 
-### TEST 1 — Validating Prefill-Decode Separation
+### TEST 1 - Validating Prefill-Decode Separation
 
 This test issues 50 concurrent requests with a detailed prompt to validate that Prefill-Decode (PD) separation is functioning correctly. The objective is to confirm that both pod pools receive traffic and that token-level metrics are emitted as expected under concurrent load.
 
@@ -581,11 +581,11 @@ sum by(pod)(
 
 **Analysis:** This graph shows token generation across decode pods. Unlike prefill, token generation increases more gradually and remains sustained over time as responses are streamed. This reflects the sequential nature of token generation and confirms that decode operates independently from prefill.
 
-**Test Results:** The observed pattern — an initial prefill spike followed by sustained decode throughput — validates correct phase separation. Prefill absorbs bursty prompt processing, while decode maintains steady token generation, demonstrating effective workload isolation under concurrent load. This establishes a baseline for evaluating cache efficiency and latency improvements in the next test.
+**Test Results:** The observed pattern, an initial prefill spike followed by sustained decode throughput, validates correct phase separation. Prefill absorbs bursty prompt processing, while decode maintains steady token generation, demonstrating effective workload isolation under concurrent load. This establishes a baseline for evaluating cache efficiency and latency improvements in the next test.
 
 ---
 
-### TEST 2 — Evaluating KV Cache Efficiency and Latency
+### TEST 2 - Evaluating KV Cache Efficiency and Latency
 
 KV cache efficiency is the primary differentiator in disaggregated inference. The key indicator is the prefix cache hit rate per decode pod. High cache hit rates imply that semantically similar requests are routed to pods with existing KV cache state, avoiding redundant computation.
 
@@ -618,7 +618,7 @@ sum by(pod)(
 
 <img width="2940" height="1332" alt="image" src="https://github.com/user-attachments/assets/00b7f7ac-d3dc-40ac-b741-457d0b65b5d6" />
 
-**Analysis:** This graph shows prefix cache hit rates broken down per decode pod. The lines are not uniform — one or more pods show consistently higher cache hit rates compared to others. This uneven distribution indicates that requests with similar prompt structures are repeatedly routed to the same pod, confirming effective cache-aware scheduling. This is the most critical metric in disaggregated inference — without sustained cache hit rates, Prefill-Decode separation does not provide meaningful performance improvements.
+**Analysis:** This graph shows prefix cache hit rates broken down per decode pod. The lines are not uniform; one or more pods show consistently higher cache hit rates compared to others. This uneven distribution indicates that requests with similar prompt structures are repeatedly routed to the same pod, confirming effective cache-aware scheduling. This is the most critical metric in disaggregated inference  without sustained cache hit rates. Prefill-Decode separation does not provide meaningful performance improvements.
 
 ### Workload Distribution
 #### Prompt Tokens (Baseline Workload)
@@ -683,9 +683,9 @@ sum by(pod)(
 
 <img width="3022" height="1022" alt="image" src="https://github.com/user-attachments/assets/8c3eb1d5-5cf1-46ac-8c9f-5c4886bcfdc7" />
 
-**Analysis:** This graph shows token generation distributed across decode pods. Token generation increases steadily across pods, with slight variations reflecting load balancing and cache locality. This confirms that decode workload is distributed while still benefiting from routing decisions that preserve cache efficiency.
+**Analysis:** This graph shows token generation distributed across decode pods. Token generation increases steadily across pods, with slight variations reflecting load balancing and cache locality. This confirms that the decode workload is distributed while still benefiting from routing decisions that preserve cache efficiency.
 
-**Test Results:** The observed patterns — asymmetric cache hits, bursty prefill spikes, stable decode latency, and steady token generation — collectively confirm that Prefill-Decode separation and cache-aware scheduling are functioning as intended. Cache reuse reduces redundant computation, improves latency, and maintains efficient GPU utilization under load.
+**Test Results:** The observed patterns, asymmetric cache hits, bursty prefill spikes, stable decode latency, and steady token generation collectively confirm that Prefill-Decode separation and cache-aware scheduling are functioning as intended. Cache reuse reduces redundant computation, improves latency, and maintains efficient GPU utilization under load.
 
 ---
 
@@ -712,10 +712,10 @@ This level of visibility transforms LLM serving from a black-box system into a d
 
 ## Key Takeaways
 
-**KV cache efficiency drives performance** in disaggregated inference — higher cache reuse directly reduces latency and redundant computation.
+**KV cache efficiency drives performance** in disaggregated inference. Higher cache reuse directly reduces latency and redundant computation.
 
 **Prefill-Decode separation** improves scalability by isolating bursty prompt processing from steady token generation, enabling independent scaling of each phase.
 
-**Scheduler tuning is workload-dependent** — prioritize cache scoring for repeated prompts, and queue depth for highly varied workloads.
+**Scheduler tuning is workload-dependent** prioritize cache scoring for repeated prompts, and queue depth for highly varied workloads.
 
 **IBM Fusion HCI simplifies operations** with reliable GPU infrastructure and seamless OpenShift integration, reducing deployment and troubleshooting overhead.
