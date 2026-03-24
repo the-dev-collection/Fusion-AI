@@ -98,7 +98,7 @@ oc get csv -A | grep -E "rhods|gpu|rhcl|serverless|nfd|leaderworkerset"
 ```
 
 **Cluster Requirements:**
-- OpenShift cluster running version **4.19.9 or later** on IBM Fusion HCI
+
 - OpenShift Service Mesh v2 must **not** be installed (conflicts with Gateway API)
 - Gateway API resources configured (see below)
 - Access to the OpenShift CLI (`oc`)
@@ -285,8 +285,6 @@ spec:
   model:
     name: mistralai/Ministral-3-8B-Instruct-2512
     uri: 'hf://mistralai/Ministral-3-8B-Instruct-2512'
-
-  # Prefill pool: compute-intensive prompt processing
   prefill:
     replicas: 2
     template:
@@ -313,70 +311,66 @@ spec:
               cpu: '4'
               memory: 48Gi
               nvidia.com/gpu: '1'
-
-  # Decode pool: memory-bandwidth-sensitive token generation
   replicas: 2
-
-  # Gateway and HTTPRoute
   router:
     gateway: {}
     route: {}
+    scheduler:
+      template:
+        containers:
+          - args:
+              - '--pool-name'
+              - '{{ ChildName .ObjectMeta.Name `-inference-pool` }}'
+              - '--pool-namespace'
+              - '{{ .ObjectMeta.Namespace }}'
+              - '--zap-encoder'
+              - json
+              - '--grpc-port'
+              - '9002'
+              - '--grpc-health-port'
+              - '9003'
+              - '--secure-serving'
+              - '--model-server-metrics-scheme'
+              - https
+              - '--enable-pprof'
+              - '--zap-log-level'
+              - debug
+              - '--cert-path'
+              - /var/run/kserve/tls
+              - '--config-text'
+              - |
+                apiVersion: inference.networking.x-k8s.io/v1alpha1
+                kind: EndpointPickerConfig
+                plugins:
+                  - type: prefill-header-handler
+                  - type: prefill-filter
+                  - type: decode-filter
+                  - type: queue-scorer
+                  - type: kv-cache-utilization-scorer
+                  - type: max-score-picker
+                  - type: pd-profile-handler
+                    parameters:
+                      threshold: 0
+                      hashBlockSize: 16
 
-  # EPP Scheduler configuration
-  scheduler:
-    template:
-      containers:
-        - args:
-            - '--pool-name'
-            - '{{ ChildName .ObjectMeta.Name `-inference-pool` }}'
-            - '--pool-namespace'
-            - '{{ .ObjectMeta.Namespace }}'
-            - '--zap-encoder'
-            - json
-            - '--grpc-port'
-            - '9002'
-            - '--grpc-health-port'
-            - '9003'
-            - '--secure-serving'
-            - '--model-server-metrics-scheme'
-            - https
-            - '--enable-pprof'
-            - '--zap-log-level'
-            - debug
-            - '--cert-path'
-            - /var/run/kserve/tls
-            - '--config-text'
-            - |
-              apiVersion: inference.networking.x-k8s.io/v1alpha1
-              kind: EndpointPickerConfig
-              plugins:
-                - type: prefill-header-handler
-                - type: prefill-filter
-                - type: decode-filter
-                - type: queue-scorer
-                - type: kv-cache-utilization-scorer
-                - type: max-score-picker
-                - type: pd-profile-handler
-              parameters:
-                threshold: 0
-                hashBlockSize: 16
-              schedulingProfiles:
-                - name: prefill
-                  plugins:
-                    - pluginRef: prefill-filter
-                    - pluginRef: queue-scorer
-                      weight: 1.0
-                    - pluginRef: max-score-picker
-                - name: decode
-                  plugins:
-                    - pluginRef: decode-filter
-                    - pluginRef: queue-scorer
-                      weight: 1.0
-                    - pluginRef: kv-cache-utilization-scorer
-                      weight: 2.0
-                    - pluginRef: max-score-picker
-          name: main
-          resources: {}
+                schedulingProfiles:
+                  - name: prefill
+                    plugins:
+                      - pluginRef: prefill-filter
+                      - pluginRef: queue-scorer
+                        weight: 1.0
+                      - pluginRef: max-score-picker
+
+                  - name: decode
+                    plugins:
+                      - pluginRef: decode-filter
+                      - pluginRef: queue-scorer
+                        weight: 1.0
+                      - pluginRef: kv-cache-utilization-scorer
+                        weight: 2.0
+                      - pluginRef: max-score-picker
+            name: main
+            resources: {}
   template:
     containers:
       - env:
@@ -401,6 +395,7 @@ spec:
             cpu: '4'
             memory: 48Gi
             nvidia.com/gpu: '1'
+
 ```
 
 ### Understanding the EPP Scheduler Plugins
