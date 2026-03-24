@@ -10,7 +10,7 @@ This blog walks through the prerequisites, the `LLMInferenceService` CR configur
 
 ---
 
-## Architecture: What We're Building
+## Disaggregated Inference Architecture
 
 The request path from user to model looks like this:
 
@@ -273,7 +273,7 @@ annotations:
 
 This is the core of what makes llm-d different from a standard KServe deployment. The `LLMInferenceService` CR defines separate Prefill and Decode replica pools, and configures the EPP Scheduler with plugin weights that determine how requests are routed between them.
 
-Here is the full CR we used:
+Here is the full CR:
 
 ```yaml
 apiVersion: serving.kserve.io/v1alpha1
@@ -718,6 +718,9 @@ This level of visibility transforms LLM serving from a black-box system into a d
 ## Key Takeaways
 
 **KV cache efficiency drives performance** in disaggregated inference — higher cache reuse directly reduces latency and redundant computation.
+
 **Prefill-Decode separation** improves scalability by isolating bursty prompt processing from steady token generation, enabling independent scaling of each phase.
+
 **Scheduler tuning is workload-dependent** — prioritize cache scoring for repeated prompts, and queue depth for highly varied workloads.
+
 **IBM Fusion HCI simplifies operations** with reliable GPU infrastructure and seamless OpenShift integration, reducing deployment and troubleshooting overhead.
