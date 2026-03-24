@@ -689,24 +689,27 @@ sum by(pod)(
 
 ---
 
-## Observability: From Black Box to Transparent Pipeline
+## Observability and Metrics
 
-Traditional LLM inference exposes only end-to-end latency, providing limited visibility into internal bottlenecks.
+Traditional LLM inference typically exposes end-to-end latency, which limits visibility into where time is spent within the inference pipeline.
 
-With llm-d, each stage of inference is observable:
+With llm-d, metrics are available at each stage of the request lifecycle, enabling more granular analysis:
 
 - **Prefill phase** → `prompt_tokens_total`, `time_to_first_token_seconds`
 - **Decode phase** → `generation_tokens_total`, `request_decode_time_seconds`
 - **Cache layer** → `prefix_cache_hits_total`
 - **Scheduler routing** → `num_requests_running` segmented by `llm_svc_role`
 
-This enables precise root-cause analysis:
-- Increased latency → prefill saturation or cache misses  
-- Elevated decode time → token generation bottlenecks  
-- Low cache hit rate → suboptimal request routing  
+These metrics represent a subset of the available signals and provide useful insights into key performance characteristics of the system.
 
-On IBM Fusion HCI, these metrics integrate natively with the OpenShift monitoring stack, requiring no additional instrumentation beyond enabling user workload monitoring.
-This level of visibility transforms LLM serving from a black-box system into a diagnosable and optimizable pipeline.
+They enable more targeted analysis, for example:
+Increased latency may indicate higher prefill load or reduced cache effectiveness
+Elevated decode time may suggest token generation bottlenecks
+Low cache hit rates may indicate limited prompt reuse or suboptimal routing
+
+On IBM Fusion HCI, these metrics are available through the OpenShift monitoring stack when user workload monitoring is enabled.
+
+This visibility allows inference behavior to be analyzed at a component level rather than relying solely on aggregate latency.
 
 ---
 
