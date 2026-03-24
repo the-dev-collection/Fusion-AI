@@ -717,12 +717,7 @@ This level of visibility transforms LLM serving from a black-box system into a d
 
 ## Key Takeaways
 
-**KV cache efficiency is the primary driver of performance in disaggregated inference.**
-
-**Prefill-Decode disaggregation delivers measurable benefits.** Once you observe the per-role metrics side by side — prefill pods handling bursty compute load, decode pods performing steady token generation — the architecture's value becomes clear. Scaling them independently based on actual load profiles is demonstrably superior to scaling monolithic serving pods.
-
-**EPP Scheduler plugin weights require tuning.** The balance between `queue-scorer` and `kv-cache-utilization-scorer` depends on your workload characteristics. For workloads with high prompt similarity, weight the cache scorer higher (2.0+). For highly varied one-shot workloads, queue depth becomes the dominant signal (weight 1.0+). Monitor per-pod cache hit distribution as your calibration metric.
-
-**Authentication ordering is non-negotiable.** The ODH Model Controller creates AuthPolicies automatically when Kuadrant is running — but only if Kuadrant was running before the `LLMInferenceService` was deployed. If you get the order wrong, you need to restart the controllers and redeploy. Follow the prerequisite sequence in the docs exactly.
-
-**IBM Fusion HCI provides infrastructure reliability.** Pre-validated GPU node profiles, high-throughput storage for model weights, and native OpenShift integration eliminate infrastructure debugging. You can focus on tuning inference parameters rather than troubleshooting cluster issues. For production deployments, this infrastructure predictability significantly reduces operational overhead.
+**KV cache efficiency drives performance** in disaggregated inference — higher cache reuse directly reduces latency and redundant computation.
+**Prefill-Decode separation** improves scalability by isolating bursty prompt processing from steady token generation, enabling independent scaling of each phase.
+**Scheduler tuning is workload-dependent** — prioritize cache scoring for repeated prompts, and queue depth for highly varied workloads.
+**IBM Fusion HCI simplifies operations** with reliable GPU infrastructure and seamless OpenShift integration, reducing deployment and troubleshooting overhead.
