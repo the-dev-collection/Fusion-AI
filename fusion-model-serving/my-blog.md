@@ -6,7 +6,7 @@ Getting an LLM to respond is straightforward. Getting it to respond consistently
 
 Red Hat OpenShift AI 3.0 introduces a new inference architecture built around llm-d, which disaggregates the Prefill and Decode phases of LLM inference into separate, independently-scalable pod pools. Running this stack on IBM Fusion HCI further simplifies GPU, storage, and operator readiness for enterprise AI workloads.
 
-This blog walks through the prerequisites, the `LLMInferenceService` CR configuration with full Prefill-Decode separation, the authentication setup via Red Hat Connectivity Link, and three rounds of load testing with real Prometheus metrics. The model used was `mistralai/Ministral-3-8B-Instruct-2512`, deployed in the `llm-model-serving` namespace on IBM Fusion HCI running OpenShift 4.19+.
+This blog walks through the prerequisites, the `LLMInferenceService` CR configuration with full Prefill-Decode separation, the authentication setup via Red Hat Connectivity Link, and two rounds of load testing with real Prometheus metrics. The model used was `mistralai/Ministral-3-8B-Instruct-2512`, deployed in the `llm-model-serving` namespace on IBM Fusion HCI running OpenShift 4.19+.
 
 ---
 
@@ -468,14 +468,19 @@ By default, the inference gateway service is exposed as a `ClusterIP`, which is 
 oc expose service openshift-ai-inference-openshift-ai-inference -n openshift-ingress
 ```
 
+**Note**: This approach works on IBM Fusion HCI but may differ in other OpenShift environments. Verify the service name with `oc get svc -n openshift-ingress` before running.
+
 ### Get the External Host
 
 ```bash
-oc get route openshift-ai-inference-openshift-ai-inference -n openshift-ingress
+oc get route openshift-ai-inference -n openshift-ingress
 ```
 
 Example output:
 ```
+oc get route openshift-ai-inference -n openshift-ingress
+NAME                     HOST/PORT                                                                   PATH   SERVICES                                        
+openshift-ai-inference   openshift-ai-inference-openshift-ingress.apps.<cluster-domain>                     openshift-ai-inference-openshift-ai-inference 
 NAME                                          HOST/PORT
 openshift-ai-inference-openshift-ai-inference openshift-ai-inference-openshift-ai-inference.apps.<cluster-domain>
 ```
@@ -530,8 +535,9 @@ This test issues 50 concurrent requests with a detailed prompt to validate that 
 
 ```bash
 PROMPT="Explain Quantum Computing in detail with examples and code"
+
 seq 1 50 | xargs -n1 -P15 -I{} curl -k \
-  https://openshift-ai-inference.../v1/chat/completions \
+  https://openshift-ai-inference-openshift-ingress.apps.f07d005.fusion.tadn.ibm.com/llm-model-serving/v1/chat/completions \
   -H "Authorization: Bearer $(oc whoami -t)" \
   -H "Content-Type: application/json" \
   -d "{
@@ -591,7 +597,7 @@ KV cache efficiency is the primary differentiator in disaggregated inference. Th
 **Load Test Command:**
 
 ```bash
-PROMPT="PROMPT="Explain in detail how event-driven architectures using Apache Kafka work in large-scale distributed systems, including producer-consumer models, partitioning strategies, offset management, message durability, fault tolerance, and exactly-once semantics""
+PROMPT="Explain in detail how event-driven architectures using Apache Kafka work in large-scale distributed systems, including producer-consumer models, partitioning strategies, offset management, message durability, fault tolerance, and exactly-once semantics"
 
 seq 1 100 | xargs -n1 -P10 -I{} curl -k https://openshift-ai-inference-openshift-ingress.apps.f07d005.fusion.tadn.ibm.com/llm-model-serving/ministral-3-8b-pd/v1/chat/completions \
   -H "Authorization: Bearer $(oc whoami -t)" \
