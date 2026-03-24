@@ -1,13 +1,12 @@
 # Deploying LLM on IBM Fusion HCI with llm-d and Red Hat OpenShift AI 3.0
 
-
 ## Introduction
 
-Getting an LLM to respond is the easy part. Getting it to respond consistently, at scale, with observable performance — that's where most deployments run into trouble.
+Getting an LLM to respond is straightforward. Getting it to respond consistently, at scale, with observable performance — that's where most deployments run into trouble.
 
 Red Hat OpenShift AI 3.0 introduces a new inference architecture built around llm-d, which disaggregates the Prefill and Decode phases of LLM inference into separate, independently-scalable pod pools. Running this stack on IBM Fusion HCI further simplifies GPU, storage, and operator readiness for enterprise AI workloads.
 
-In this blog, I'll walk through the prerequisites, the `LLMInferenceService` CR configuration with full Prefill-Decode separation, the authentication setup via Red Hat Connectivity Link, and three rounds of load testing with real Prometheus metrics. The model used was `mistralai/Ministral-3-8B-Instruct-2512`, deployed in the `llm-model-serving` namespace on IBM Fusion HCI running OpenShift 4.19+.
+This blog walks through the prerequisites, the `LLMInferenceService` CR configuration with full Prefill-Decode separation, the authentication setup via Red Hat Connectivity Link, and three rounds of load testing with real Prometheus metrics. The model used was `mistralai/Ministral-3-8B-Instruct-2512`, deployed in the `llm-model-serving` namespace on IBM Fusion HCI running OpenShift 4.19+.
 
 ---
 
@@ -36,7 +35,7 @@ User Request (HTTPS)
         ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ EPP Scheduler (Endpoint Picker Protocol)                    │
-│                                                              │
+│                                                             │
 │ Scheduling Plugins:                                         │
 │ ├── prefill-header-handler                                  │
 │ ├── prefill-filter    → routes prefill to prefill pool      │
@@ -61,17 +60,17 @@ User Request (HTTPS)
 └─────────┘  └─────────┘
 ```
 
-**What llm-d changes about this picture** is the EPP Scheduler layer. Traditional vLLM deployments route requests using round-robin or simple load balancing. The EPP Scheduler in llm-d routes based on semantic awareness of the inference pipeline: it understands which phase a request is in (prefill vs decode), which pods have warm KV caches for similar prompts, and the current queue depth per pod. The result is measurably better GPU utilization and lower time-to-first-token (TTFT) for workloads with prompt overlap.
+**The key difference introduced by llm-d** is the EPP Scheduler layer. Traditional vLLM deployments rely on round-robin or simple load balancing. The EPP Scheduler in llm-d routes based on semantic awareness of the inference pipeline: it understands which phase a request is in (prefill vs decode), which pods have warm KV caches for similar prompts, and the current queue depth per pod. The result is measurably better GPU utilization and lower time-to-first-token (TTFT) for workloads with prompt overlap.
 
 ---
 
 ## Prerequisites
 
-### IBM Fusion HCI Cluster
+### Platform Requirements
 
-- IBM Fusion HCI cluster installed, running, and healthy
-- OpenShift 4.19+ running on Fusion
-- GPU nodes with NVIDIA GPUs
+- IBM Fusion HCI cluster installed and healthy
+- OpenShift 4.19.9+ running on Fusion
+- GPU-enabled worker nodes (NVIDIA GPUs)
 - Cluster admin access
 
 ### OpenShift Cluster and Operator Requirements
@@ -82,14 +81,14 @@ According to the [official OpenShift AI 3.3 documentation](https://docs.redhat.c
 
 Install these operators from OperatorHub in the OpenShift Web Console:
 
-| Operator | Channel | Purpose | Notes |
-|---|---|---|---|
-| Red Hat OpenShift AI | `fast-3.x` | Core AI/ML platform with KServe | Includes model serving capabilities |
-| NVIDIA GPU Operator | `v25.10` | GPU device plugin & drivers | Required for GPU workloads |
-| Red Hat Connectivity Link | `stable` (v1.1.1+) | API gateway, auth & rate limiting (Kuadrant) | Must be installed before deploying models |
-| Red Hat OpenShift Serverless | `stable` | Knative for serverless inference scaling | Required for KServe |
-| Node Feature Discovery | `stable` | Detects hardware features (GPUs, CPUs) | Auto-labels GPU nodes |
-| LeaderWorkerSet Operator | `stable` | Manages prefill-decode pod groups | Required for llm-d |
+| Operator | Channel | Purpose |
+|---|---|---|
+| Node Feature Discovery | `stable` | Automatically detects and labels GPU nodes for workload scheduling |
+| NVIDIA GPU Operator | `stable` | Manages GPU drivers, device plugins, and container runtime for GPU workloads |
+| Red Hat OpenShift Serverless | `stable` | Provides Knative Serving for auto-scaling inference workloads |
+| Red Hat OpenShift AI | `stable-3.x` | Provides KServe for model serving and inference management |
+| LeaderWorkerSet Operator | `stable` | Manages coordinated prefill-decode pod groups for llm-d disaggregated inference |
+| Red Hat Connectivity Link | `stable` | Provides Kuadrant for API gateway, authentication (Authorino), and rate limiting (Limitador) |
 
 **Verify Operator Installation:**
 
@@ -101,28 +100,86 @@ oc get csv -A | grep -E "rhods|gpu|rhcl|serverless|nfd|leaderworkerset"
 **Cluster Requirements:**
 - OpenShift cluster running version **4.19.9 or later** on IBM Fusion HCI
 - OpenShift Service Mesh v2 must **not** be installed (conflicts with Gateway API)
-- A `GatewayClass` and a `Gateway` named `openshift-ai-inference` in the `openshift-ingress` namespace
+- Gateway API resources configured (see below)
 - Access to the OpenShift CLI (`oc`)
 - Cluster admin access
+
+### Gateway API Configuration
+
+The Gateway API is used to expose LLM inference endpoints via HTTPS. Two resources are required:
+
+**1. GatewayClass**
+
+The `GatewayClass` defines the controller that manages Gateway resources:
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: openshift-ai-inference
+spec:
+  controllerName: openshift.io/gateway-controller/v1
+```
+
+**2. Gateway**
+
+The `Gateway` resource in the `openshift-ingress` namespace exposes HTTP (port 80) and HTTPS (port 443) endpoints:
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: openshift-ai-inference
+  namespace: openshift-ingress
+spec:
+  gatewayClassName: openshift-ai-inference
+  listeners:
+    - name: http
+      port: 80
+      protocol: HTTP
+      allowedRoutes:
+        namespaces:
+          from: All
+    - name: https
+      port: 443
+      protocol: HTTPS
+      allowedRoutes:
+        namespaces:
+          from: All
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: router-certs-default
+```
+
+**TLS Certificate Configuration:**
+
+The Gateway uses the existing `router-certs-default` secret from the `openshift-ingress` namespace, which is managed by the OpenShift ingress controller. This provides automatic TLS termination with OpenShift-managed certificates. For production-grade deployments, you can provide a custom TLS certificate by creating your own secret and referencing it in the `certificateRefs` field.
 
 **Verify Gateway API Resources:**
 
 ```bash
-# Verify Gateway API is configured
-oc get gatewayclass
+# Verify GatewayClass exists
+oc get gatewayclass openshift-ai-inference
+
+# Verify Gateway is configured
 oc get gateway -n openshift-ingress openshift-ai-inference
+
+# Check Gateway status
+oc get gateway -n openshift-ingress openshift-ai-inference -o yaml
 ```
 
 **Authentication Requirements:**
-- Red Hat Connectivity Link must be configured **before** deploying the `LLMInferenceService`
-- Create a `ServiceAccount` with permission to access the `LLMInferenceService`
-- Generate a JWT token for API authentication
+- Red Hat Connectivity Link must be installed and fully configured before deploying any LLMInferenceService, as it is required for authentication and AuthPolicy creation
+- A ServiceAccount with permission to access the LLMInferenceService must be created
+- A JWT token must be generated from this ServiceAccount and used for authenticating inference requests
 
 ---
 
 ## Step 1: Configure Authentication First
 
-**Critical ordering requirement:** Authentication via Red Hat Connectivity Link must be configured **before** deploying the `LLMInferenceService`. The ODH Model Controller creates `AuthPolicy` resources automatically when you deploy a model — but only if Kuadrant is already running and Authorino is properly configured.
+**Critical ordering requirement:** Authentication via Red Hat Connectivity Link must be configured **before deploying the LLMInferenceService**. In OpenShift AI 3.0 and later, authentication and authorization are automatically enabled for LLMInferenceService resources when Red Hat Connectivity Link is configured. 
 
 ### Create the Kuadrant CR
 
@@ -346,15 +403,39 @@ spec:
             nvidia.com/gpu: '1'
 ```
 
-### Configuration Decisions Worth Explaining
+### Understanding the EPP Scheduler Plugins
 
-**`hashBlockSize: 16`** controls the granularity of KV cache prefix matching. The EPP Scheduler tracks which blocks of context are cached on which decode pod. With a block size of 16 tokens, the scheduler can match cache state at a finer resolution — meaning partial prompt overlaps (shared system prompts, few-shot examples) still get cache hits. A larger block size is coarser and misses more partial matches; a smaller one creates more index overhead. 16 tokens was the tuned value for our workload.
+The EPP (Endpoint Picker Protocol) Scheduler uses a plugin-based architecture to make intelligent routing decisions. Here's how each plugin contributes to the inference pipeline:
 
-**KV Cache Utilization Scorer weight 2.0 vs Queue Scorer weight 1.0** on the decode scheduling profile means the scheduler prioritizes cache hits over queue depth. The scheduler will send a request to a slightly busier pod if that pod already holds the matching KV prefix. For decode-phase requests, the cost of a cache miss (recomputing the full prompt context) outweighs the cost of a marginally longer queue. We measured this trade-off empirically — cache-aware routing provides better performance at any reasonable queue depth for our prompt distribution.
+#### Core Scheduling Plugins
 
-**Prefill scheduling is queue-only.** The prefill pool has no cache affinity scoring because prefill is purely compute-bound. Each prefill pod processes prompts independently; there's no cache state to reuse between prefill requests. Routing based only on queue length is both correct and optimal for the prefill phase.
+**`prefill-header-handler`** - Inspects incoming requests and tags them with metadata indicating whether they're in the prefill or decode phase. This enables phase-aware routing downstream.
 
-**`initialDelaySeconds: 300`** on the liveness probe. Model loading for an 8B parameter model takes several minutes — the pod needs time to download model weights and load them into GPU memory before the health endpoint responds. This is particularly relevant on IBM Fusion HCI where storage reads happen over the network fabric; 300 seconds provides a safe buffer for model initialization.
+**`prefill-filter`** - Routes prefill-phase requests exclusively to the prefill pod pool. Ensures compute-intensive prompt processing is isolated from token generation.
+
+**`decode-filter`** - Routes decode-phase requests exclusively to the decode pod pool. Ensures memory-bandwidth-sensitive token generation happens on pods optimized for sequential output.
+
+**`queue-scorer` (weight 1.0)** - Scores pods based on current queue depth. Lower queue = higher score. Prevents any single pod from becoming a bottleneck.
+
+**`kv-cache-utilization-scorer` (weight 2.0)** - Scores pods based on KV cache prefix matches. If a pod already has the prompt context cached, it gets a higher score. **This is the key differentiator** — the 2.0 weight means cache affinity is prioritized over queue depth for decode requests.
+
+**`max-score-picker`** - Selects the pod with the highest combined score from all scorers. The final routing decision balances queue depth and cache efficiency.
+
+**`pd-profile-handler`** - Manages the scheduling profiles (prefill vs decode) and applies the appropriate plugin chain based on request phase.
+
+#### Key Configuration Parameters
+
+**`hashBlockSize: 16`** - Controls KV cache prefix matching granularity. The scheduler tracks cached context in 16-token blocks. This allows partial prompt overlaps (shared system prompts, few-shot examples) to still get cache hits. Smaller blocks = finer matching but more overhead; larger blocks = coarser matching but fewer cache hits.
+
+**Scheduling Profile Weights:**
+- **Prefill profile:** `queue-scorer` only (weight 1.0) — prefill is compute-bound with no cache reuse
+- **Decode profile:** `queue-scorer` (weight 1.0) + `kv-cache-utilization-scorer` (weight 2.0) — decode benefits from cache-aware routing
+
+The 2:1 weight ratio means the scheduler will route to a slightly busier pod if that pod has the matching KV cache. For decode requests, avoiding a cache miss (recomputing full prompt context) outweighs a marginally longer queue.
+
+**`threshold: 0`** - The scheduler considers all healthy pods for every request. In larger deployments, you might raise this to exclude heavily loaded pods.
+
+**`initialDelaySeconds: 300`** - Model loading for an 8B parameter model takes several minutes. The pod needs time to download weights and load them into GPU memory before the health endpoint responds. On IBM Fusion HCI where storage reads happen over the network fabric, 300 seconds provides a safe initialization buffer.
 
 ---
 
@@ -377,13 +458,75 @@ oc get llminferenceservice ministral-3-8b-pd -n llm-model-serving \
 
 ---
 
-## Step 4: Load Testing and Observability
+## Step 4: Exposing the LLM Inference Service Externally
 
-We ran two focused test scenarios to validate the Prefill-Decode separation and KV cache efficiency. All metrics were scraped by Prometheus and queried via the OpenShift monitoring stack.
+By default, the inference gateway service is exposed as a `ClusterIP`, which is only accessible within the cluster. To access the model externally, you must create an OpenShift Route.
 
-### TEST 1 — Basic Load: Sanity Check and Token Metrics
+### Expose the Gateway Service
 
-The first test fires 50 concurrent requests with a detailed prompt to confirm that the PD separation is working — both pod pools receiving traffic, token metrics emitting correctly.
+```bash
+oc expose service openshift-ai-inference-openshift-ai-inference -n openshift-ingress
+```
+
+### Get the External Host
+
+```bash
+oc get route openshift-ai-inference-openshift-ai-inference -n openshift-ingress
+```
+
+Example output:
+```
+NAME                                          HOST/PORT
+openshift-ai-inference-openshift-ai-inference openshift-ai-inference-openshift-ai-inference.apps.<cluster-domain>
+```
+
+### Construct the Model Endpoint
+
+The inference endpoint follows this pattern:
+```
+https://<route-host>/<namespace>/<llm-service-name>
+```
+
+Example for the `ministral-3-8b-pd` service in the `llm-model-serving` namespace:
+```
+https://openshift-ai-inference-openshift-ai-inference.apps.<cluster-domain>/llm-model-serving/ministral-3-8b-pd
+```
+
+### Verify External Access
+
+Test the endpoint by listing available models:
+
+```bash
+curl -k https://<route-host>/llm-model-serving/<llm-service-name>/v1/models \
+  -H "Authorization: Bearer $(oc whoami -t)"
+```
+
+Example response:
+```json
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "mistralai/Ministral-3-8B-Instruct-2512",
+      "object": "model",
+      "created": 1234567890,
+      "owned_by": "system"
+    }
+  ]
+}
+```
+
+---
+
+## Step 5: Load Testing and Observability
+
+Two targeted test scenarios were executed to validate Prefill-Decode separation and KV cache efficiency. All metrics were collected via Prometheus using the OpenShift monitoring stack.
+
+### TEST 1 — Validating Prefill-Decode Separation
+
+This test issues 50 concurrent requests with a detailed prompt to validate that Prefill-Decode (PD) separation is functioning correctly. The objective is to confirm that both pod pools receive traffic and that token-level metrics are emitted as expected under concurrent load.
+
+**Load Test Command:**
 
 ```bash
 PROMPT="Explain Quantum Computing in detail with examples and code"
@@ -397,10 +540,9 @@ seq 1 50 | xargs -n1 -P15 -I{} curl -k \
   }"
 ```
 
-
 #### Running Requests
 
-Validates load distribution across pods:
+**Metric:** Number of in-flight requests
 
 ```promql
 kserve_vllm:num_requests_running
@@ -408,19 +550,12 @@ kserve_vllm:num_requests_running
 
 <img width="3006" height="1586" alt="image" src="https://github.com/user-attachments/assets/d8d2e0db-4f71-42cf-91f1-c9e3b75e0ccf" />
 
+**Analysis:** This graph shows the number of in-flight requests across the system. A sharp increase is visible as concurrent requests are initiated, followed by a gradual decline as requests complete. This pattern confirms that the system is handling parallel load and draining requests as expected.
 
-#### Per-Pod Token Breakdown
+#### Prefill Tokens per Pod
 
-**Decode tokens per pod:**
-```promql
-sum by(pod)(
-  rate(kserve_vllm_generation_tokens_total{llm_svc_role="decode"}[1m])
-)
-```
-<img width="2948" height="1336" alt="image" src="https://github.com/user-attachments/assets/ba784a2e-fbd3-4f2a-be6b-6468abe4eeba" />
+**Metric:** Prompt token processing in prefill phase
 
-
-**Prefill tokens per pod:**
 ```promql
 sum by(pod)(
   rate(kserve_vllm_prompt_tokens_total{llm_svc_role="prefill"}[1m])
@@ -429,33 +564,65 @@ sum by(pod)(
 
 <img width="2934" height="1344" alt="image" src="https://github.com/user-attachments/assets/71081b6e-328d-430f-945e-0f9973aafcc4" />
 
+**Analysis:** This graph shows prompt token processing across prefill pods. A noticeable spike occurs early in the timeline, indicating that multiple prompts are processed simultaneously. The activity then tapers off as requests transition into the decode phase, confirming that prefill handles the initial burst of computation.
 
+#### Decode Tokens per Pod
 
-**Results:** Both the `ministral-3-8b-pd-kserve-prefill-*` and `ministral-3-8b-pd-kserve-*` (decode) pods showed traffic, and the `llm_svc_role` label confirmed correct phase tagging. The EPP Scheduler correctly routed prefill-phase requests to the prefill pool and decode-phase requests to the decode pool, with no cross-contamination.
+**Metric:** Token generation in decode phase
 
-The metric graphs showed decode token generation climbing as 50 concurrent requests progressed through the pipeline. Prefill token throughput spiked early (parallel prompt processing is fast) and then settled as requests moved into the decode phase.
+```promql
+sum by(pod)(
+  rate(kserve_vllm_generation_tokens_total{llm_svc_role="decode"}[1m])
+)
+```
+
+<img width="2948" height="1336" alt="image" src="https://github.com/user-attachments/assets/ba784a2e-fbd3-4f2a-be6b-6468abe4eeba" />
+
+**Analysis:** This graph shows token generation across decode pods. Unlike prefill, token generation increases more gradually and remains sustained over time as responses are streamed. This reflects the sequential nature of token generation and confirms that decode operates independently from prefill.
+
+**Test Results:** The observed pattern — an initial prefill spike followed by sustained decode throughput — validates correct phase separation. Prefill absorbs bursty prompt processing, while decode maintains steady token generation, demonstrating effective workload isolation under concurrent load. This establishes a baseline for evaluating cache efficiency and latency improvements in the next test.
 
 ---
 
-### TEST 2 — KV Cache Efficiency: The Critical Performance Test
+### TEST 2 — Evaluating KV Cache Efficiency and Latency
 
-KV cache efficiency is the primary performance differentiator of disaggregated inference. The metric that matters most is the prefix cache hit rate per decode pod. A high hit rate indicates the EPP Scheduler is correctly routing semantically-similar requests to the same decode pod, where the KV cache state from previous requests is already in GPU memory, eliminating redundant computation.
+KV cache efficiency is the primary differentiator in disaggregated inference. The key indicator is the prefix cache hit rate per decode pod. High cache hit rates imply that semantically similar requests are routed to pods with existing KV cache state, avoiding redundant computation.
 
-#### KV Cache Hits Per Decode Pod
+**Load Test Command:**
 
-Primary metric for cache effectiveness:
+```bash
+PROMPT="PROMPT="Explain in detail how event-driven architectures using Apache Kafka work in large-scale distributed systems, including producer-consumer models, partitioning strategies, offset management, message durability, fault tolerance, and exactly-once semantics""
+
+seq 1 100 | xargs -n1 -P10 -I{} curl -k https://openshift-ai-inference-openshift-ingress.apps.f07d005.fusion.tadn.ibm.com/llm-model-serving/ministral-3-8b-pd/v1/chat/completions \
+  -H "Authorization: Bearer $(oc whoami -t)" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"model\": \"mistralai/Ministral-3-8B-Instruct-2512\",
+    \"messages\": [{\"role\": \"user\", \"content\": \"$PROMPT\"}],
+    \"max_tokens\": 200
+  }"
+
+```
+
+### Cache Effectiveness
+#### KV Cache Hits per Decode Pod
+
+**Metric:** Cache reuse efficiency
 
 ```promql
 sum by(pod)(
   rate(kserve_vllm_prefix_cache_hits_total{llm_svc_role="decode"}[1m])
 )
 ```
+
 <img width="2940" height="1332" alt="image" src="https://github.com/user-attachments/assets/00b7f7ac-d3dc-40ac-b741-457d0b65b5d6" />
 
+**Analysis:** This graph shows prefix cache hit rates broken down per decode pod. The lines are not uniform — one or more pods show consistently higher cache hit rates compared to others. This uneven distribution indicates that requests with similar prompt structures are repeatedly routed to the same pod, confirming effective cache-aware scheduling. This is the most critical metric in disaggregated inference — without sustained cache hit rates, Prefill-Decode separation does not provide meaningful performance improvements.
 
-#### Token Comparison for Cache Efficiency
+### Workload Distribution
+#### Prompt Tokens (Baseline Workload)
 
-Shows the relationship between prompt tokens processed and cache hits:
+**Metric:** Incoming prompt workload
 
 ```promql
 increase(kserve_vllm_prompt_tokens_total[1m])
@@ -463,26 +630,12 @@ increase(kserve_vllm_prompt_tokens_total[1m])
 
 <img width="3026" height="1476" alt="image" src="https://github.com/user-attachments/assets/247e19e8-9ed2-4a5b-81d8-d56e02e34bec" />
 
+**Analysis:** This graph shows the total number of prompt tokens processed over time. Distinct spikes are visible, corresponding to bursts of incoming requests or new prompt variations. These spikes represent fresh computation entering the system and serve as a baseline for evaluating cache effectiveness.
 
-#### Prefill Impact Analysis
+#### Prefill Tokens per Pod
 
-**Cache hits:**
-```promql
-increase(kserve_vllm_prefix_cache_hits_total[1m])
-```
+**Metric:** Prefill workload distribution
 
-<img width="3028" height="1470" alt="image" src="https://github.com/user-attachments/assets/37c0be63-bd0c-426f-ab53-492a9a438d3b" />
-
-
-**Prompt tokens (overall):**
-```promql
-increase(kserve_vllm_prompt_tokens_total[1m])
-```
-
-<img width="2992" height="1376" alt="image" src="https://github.com/user-attachments/assets/199430f8-d46b-4497-9ed3-8ba134b9ab8f" />
-
-
-**Prefill tokens per pod:**
 ```promql
 sum by(pod)(
   increase(kserve_vllm_prompt_tokens_total{llm_svc_role="prefill"}[1m])
@@ -491,20 +644,36 @@ sum by(pod)(
 
 <img width="3014" height="1138" alt="image" src="https://github.com/user-attachments/assets/e342fe72-06a4-41cf-be0b-63e2235b1dc1" />
 
+**Analysis:** This graph shows how prompt tokens are distributed across prefill pods. Spikes are visible across prefill pods during periods of increased prompt activity, while decode pods remain unaffected. This confirms that prompt processing load is isolated to the prefill layer, preventing interference with token generation.
 
-This counter tracks cumulative prefill load. Spikes correspond to new conversation turns or structurally unique prompts. The critical observation is that these spikes are isolated to the prefill pod pool — because PD is disaggregated, a sudden burst of new unique prompts does not impact decode latency on the decode pods. The two phases absorb their respective loads independently.
-
+### Latency and Performance
 #### Time to First Token (TTFT)
 
-**Token generation baseline:**
+**Metric:** Initial response latency
+
 ```promql
-increase(kserve_vllm_generation_tokens_total[1m])
+rate(kserve_vllm_time_to_first_token_seconds_sum[1m])
 ```
 
-<img width="3008" height="1574" alt="image" src="https://github.com/user-attachments/assets/3c63f7c8-d12a-41be-affa-6daf0f19f764" />
+<img width="3018" height="1460" alt="image" src="https://github.com/user-attachments/assets/fe7231c3-3302-48af-bd78-4e70818fdb10" />
 
+**Analysis:** This graph shows the rate of time-to-first-token across requests. Noticeable fluctuations correspond to differences in request processing time, with lower values occurring during periods of higher cache reuse. This indicates that requests benefiting from KV cache hits bypass redundant prefill computation, resulting in faster initial response times.
 
-**Decode tokens per pod:**
+#### Decode Latency
+
+**Metric:** Token generation latency
+
+```promql
+rate(kserve_vllm_request_decode_time_seconds_sum[1m])
+```
+
+<img width="3008" height="1422" alt="image" src="https://github.com/user-attachments/assets/9b53e851-c9af-4d34-a1cb-01fe2aeef54b" />
+
+**Analysis:** This graph shows the time spent in the decode phase across requests. The curve remains relatively stable without sharp spikes, indicating consistent token generation performance. This stability suggests that cache-aware routing reduces variability by directing requests to pods with warm KV cache state.
+
+#### Decode Tokens per Pod
+
+**Metric:** Decode workload distribution
 ```promql
 sum by(pod)(
   increase(kserve_vllm_generation_tokens_total{llm_svc_role="decode"}[1m])
@@ -513,75 +682,36 @@ sum by(pod)(
 
 <img width="3022" height="1022" alt="image" src="https://github.com/user-attachments/assets/8c3eb1d5-5cf1-46ac-8c9f-5c4886bcfdc7" />
 
+**Analysis:** This graph shows token generation distributed across decode pods. Token generation increases steadily across pods, with slight variations reflecting load balancing and cache locality. This confirms that decode workload is distributed while still benefiting from routing decisions that preserve cache efficiency.
 
-**TTFT metric:**
-```promql
-rate(kserve_vllm_time_to_first_token_seconds_sum[1m])
-```
-
-<img width="3018" height="1460" alt="image" src="https://github.com/user-attachments/assets/fe7231c3-3302-48af-bd78-4e70818fdb10" />
-
-
-TTFT is what users actually feel — the pause between sending a message and seeing the first token of the response. With KV cache prefix matching working, requests whose prompts share a prefix with a recently-processed request skip the prefill computation for the matching portion. The result is a measurable TTFT reduction for any workload with structural prompt similarity (shared system prompts, chat history, few-shot examples).
-
-#### Decode Latency
-
-**Request count (distribution/volume):**
-```promql
-rate(kserve_vllm_time_to_first_token_seconds_count[1m])
-```
-
-<img width="3010" height="1422" alt="image" src="https://github.com/user-attachments/assets/9415287b-edcb-4271-a899-a7c2e2a90e31" />
-
-
-**Actual decode latency:**
-```promql
-rate(kserve_vllm_request_decode_time_seconds_sum[1m])
-```
-
-<img width="3008" height="1422" alt="image" src="https://github.com/user-attachments/assets/9b53e851-c9af-4d34-a1cb-01fe2aeef54b" />
-
-
-This measures the time spent in the decode phase (token-by-token generation) per request. The KV cache utilization scorer at weight 2.0 meant decode pods with warm caches consistently outperformed cold pods for similar prompts. In the metrics, this showed up as lower decode latency variance — requests to the right pod (cache hit) completed faster and more predictably than requests to a cold pod.
-
-#### Cache Efficiency Analysis
-
-**Decode time count (efficiency signal):**
-```promql
-rate(kserve_vllm_request_decode_time_seconds_count[1m])
-```
-
-<img width="3022" height="1408" alt="image" src="https://github.com/user-attachments/assets/5fe0bbe4-eb4b-4e9d-b635-b40e19bbe310" />
-
-
-**Prompt tokens (denominator/reference):**
-```promql
-increase(kserve_vllm_prompt_tokens_total[1m])
-```
-
-<img width="3006" height="1420" alt="image" src="https://github.com/user-attachments/assets/5225a5a6-b403-4d26-ab11-24f5388d4894" />
-
-
-Per-pod cache hit metrics verify that the `hashBlockSize: 16` and the kv-cache-utilization-scorer at weight 2.0 are working correctly. If cache hits were evenly distributed across both decode pods, the prefix-cache scorer wouldn't be working — you'd see all hits going to whichever pod happened to process the first request. What we observed instead was asymmetric cache distribution: the decode pod that processed a given prompt class accumulated hits for subsequent similar prompts, confirming the sticky-routing behavior the scorer is designed to produce.
+**Test Results:** The observed patterns — asymmetric cache hits, bursty prefill spikes, stable decode latency, and steady token generation — collectively confirm that Prefill-Decode separation and cache-aware scheduling are functioning as intended. Cache reuse reduces redundant computation, improves latency, and maintains efficient GPU utilization under load.
 
 ---
 
 ## Observability: From Black Box to Transparent Pipeline
 
-Traditional LLM serving treats the inference process as a black box. A request goes in, tokens come out, and the only observable metric is end-to-end response time. With llm-d, every phase of inference exposes detailed metrics:
+Traditional LLM inference exposes only end-to-end latency, providing limited visibility into internal bottlenecks.
+
+With llm-d, each stage of inference is observable:
 
 - **Prefill phase** → `prompt_tokens_total`, `time_to_first_token_seconds`
 - **Decode phase** → `generation_tokens_total`, `request_decode_time_seconds`
-- **Cache layer** → `prefix_cache_hits_total`, `prefix_cache_cache_hits_total`
-- **Scheduler routing** → `num_requests_running` broken out by `llm_tox_role`
+- **Cache layer** → `prefix_cache_hits_total`
+- **Scheduler routing** → `num_requests_running` segmented by `llm_svc_role`
 
-This enables you to answer questions that were previously unanswerable without deep instrumentation: Is latency increasing because of prefill (new/unique prompts)? Because of decode (too many concurrent requests)? Because of cache misses (suboptimal routing)? Each root cause has a different solution, and without per-phase metrics you're operating blind.
+This enables precise root-cause analysis:
+- Increased latency → prefill saturation or cache misses  
+- Elevated decode time → token generation bottlenecks  
+- Low cache hit rate → suboptimal request routing  
 
-On IBM Fusion HCI, these Prometheus metrics feed into the OpenShift monitoring stack with no additional configuration. User workload monitoring needs to be enabled at the cluster level by an admin, but once enabled, the kserve metrics surface automatically via the pod monitors that the ODH stack creates.
+On IBM Fusion HCI, these metrics integrate natively with the OpenShift monitoring stack, requiring no additional instrumentation beyond enabling user workload monitoring.
+This level of visibility transforms LLM serving from a black-box system into a diagnosable and optimizable pipeline.
 
 ---
 
 ## Key Takeaways
+
+**KV cache efficiency is the primary driver of performance in disaggregated inference.**
 
 **Prefill-Decode disaggregation delivers measurable benefits.** Once you observe the per-role metrics side by side — prefill pods handling bursty compute load, decode pods performing steady token generation — the architecture's value becomes clear. Scaling them independently based on actual load profiles is demonstrably superior to scaling monolithic serving pods.
 
@@ -590,27 +720,3 @@ On IBM Fusion HCI, these Prometheus metrics feed into the OpenShift monitoring s
 **Authentication ordering is non-negotiable.** The ODH Model Controller creates AuthPolicies automatically when Kuadrant is running — but only if Kuadrant was running before the `LLMInferenceService` was deployed. If you get the order wrong, you need to restart the controllers and redeploy. Follow the prerequisite sequence in the docs exactly.
 
 **IBM Fusion HCI provides infrastructure reliability.** Pre-validated GPU node profiles, high-throughput storage for model weights, and native OpenShift integration eliminate infrastructure debugging. You can focus on tuning inference parameters rather than troubleshooting cluster issues. For production deployments, this infrastructure predictability significantly reduces operational overhead.
-
----
-
-## What's Next
-
-In future posts I'll cover:
-
-- **RateLimitPolicy** with Limitador for per-token and per-request rate limiting tiers
-- **DNSPolicy** for custom domain routing on Fusion
-- **GenAI Playground** with MCP server tool integration
-- **Multi-model deployments** sharing GPU node pools with namespace resource quotas
-
----
-
-## Resources
-
-- Red Hat OpenShift AI 3.3 — Deploying Models with Distributed Inference: [docs.redhat.com](https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.3/html/deploying_models/deploying_models#deploying-models-using-distributed-inference_rhoai-user)
-- Red Hat Blog — LLM-D Observability: [redhat.com/en/blog](https://www.redhat.com/en/blog/tokens-caches-how-llm-d-improves-llm-observability-red-hat-openshift-ai-3.0)
-- Red Hat Connectivity Link Documentation: [docs.redhat.com](https://docs.redhat.com/en/documentation/red_hat_connectivity_link/1.2/html-single/introduction_to_connectivity_link/index)
-- llm-d Project: [llm-d.ai](https://llm-d.ai)
-- IBM Fusion HCI Documentation: [ibm.com/docs/fusion](https://www.ibm.com/docs/fusion)
-- GitHub — Configuration files: [github.com/nirjhar17/openshift-ai-3-deployment](https://github.com/nirjhar17/openshift-ai-3-deployment)
-
----
