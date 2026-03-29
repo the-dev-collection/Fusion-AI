@@ -559,7 +559,7 @@ kserve_vllm:num_requests_running
 
 ```promql
 sum by(pod)(
-  rate(kserve_vllm_prompt_tokens_total{llm_svc_role="prefill"}[1m])
+  rate(kserve_vllm:prompt_tokens_total{llm_isvc_role="prefill"}[1m])
 )
 ```
 
@@ -573,7 +573,7 @@ sum by(pod)(
 
 ```promql
 sum by(pod)(
-  rate(kserve_vllm_generation_tokens_total{llm_svc_role="decode"}[1m])
+  rate(kserve_vllm:generation_tokens_total{llm_isvc_role="decode"}[1m])
 )
 ```
 
@@ -612,7 +612,7 @@ seq 1 100 | xargs -n1 -P10 -I{} curl -k https://openshift-ai-inference-openshift
 
 ```promql
 sum by(pod)(
-  rate(kserve_vllm_prefix_cache_hits_total{llm_svc_role="decode"}[1m])
+  rate(kserve_vllm:prefix_cache_hits_total{llm_isvc_role="decode"}[1m])
 )
 ```
 
@@ -626,7 +626,7 @@ sum by(pod)(
 **Metric:** Incoming prompt workload
 
 ```promql
-increase(kserve_vllm_prompt_tokens_total[1m])
+increase(kserve_vllm:prompt_tokens_total[1m])
 ```
 
 <img width="3026" height="1476" alt="image" src="https://github.com/user-attachments/assets/247e19e8-9ed2-4a5b-81d8-d56e02e34bec" />
@@ -639,7 +639,7 @@ increase(kserve_vllm_prompt_tokens_total[1m])
 
 ```promql
 sum by(pod)(
-  increase(kserve_vllm_prompt_tokens_total{llm_svc_role="prefill"}[1m])
+  increase(kserve_vllm:prompt_tokens_total{llm_isvc_role="prefill"}[1m])
 )
 ```
 
@@ -653,7 +653,7 @@ sum by(pod)(
 **Metric:** Initial response latency
 
 ```promql
-rate(kserve_vllm_time_to_first_token_seconds_sum[1m])
+rate(kserve_vllm:time_to_first_token_seconds_sum[1m])
 ```
 
 <img width="3018" height="1460" alt="image" src="https://github.com/user-attachments/assets/fe7231c3-3302-48af-bd78-4e70818fdb10" />
@@ -665,7 +665,7 @@ rate(kserve_vllm_time_to_first_token_seconds_sum[1m])
 **Metric:** Token generation latency
 
 ```promql
-rate(kserve_vllm_request_decode_time_seconds_sum[1m])
+rate(kserve_vllm:request_decode_time_seconds_sum[1m])
 ```
 
 <img width="3008" height="1422" alt="image" src="https://github.com/user-attachments/assets/9b53e851-c9af-4d34-a1cb-01fe2aeef54b" />
@@ -677,7 +677,7 @@ rate(kserve_vllm_request_decode_time_seconds_sum[1m])
 **Metric:** Decode workload distribution
 ```promql
 sum by(pod)(
-  increase(kserve_vllm_generation_tokens_total{llm_svc_role="decode"}[1m])
+  increase(kserve_vllm:generation_tokens_total{llm_isvc_role="decode"}[1m])
 )
 ```
 
@@ -709,7 +709,7 @@ Low cache hit rates may indicate limited prompt reuse or suboptimal routing
 
 On IBM Fusion HCI, these metrics are available through the OpenShift monitoring stack when user workload monitoring is enabled.
 
-This visibility allows inference behavior to be analyzed at a component level rather than relying solely on aggregate latency.
+This visibility allows inference behaviour to be analyzed at a component level rather than relying solely on aggregate latency.
 
 ---
 
@@ -722,3 +722,11 @@ This visibility allows inference behavior to be analyzed at a component level ra
 **Scheduler tuning is workload-dependent** prioritize cache scoring for repeated prompts, and queue depth for highly varied workloads.
 
 **IBM Fusion HCI simplifies operations** with reliable GPU infrastructure and seamless OpenShift integration, reducing deployment and troubleshooting overhead.
+
+---
+
+## References
+- TechXchange blog post: 
+- Red Hat OpenShift AI: [**Red Hat OpenShift AI**](https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed)
+- Deploying models by using Distributed Inference with llm-d: [**Deploying models by using Distributed Inference with llm-d**](https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.0/html/deploying_models/deploying_models#deploying-models-using-distributed-inference_rhoai-user)
+
