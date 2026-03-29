@@ -1,4 +1,4 @@
-# Disaggregated LLM Inference on IBM Fusion HCI: Prefill-Decode Separation, KV Cache Efficiency, and Observability
+# Disaggregated LLM Inference on IBM Fusion HCI: Prefill-Decode Separation and KV Cache Optimization
 
 ## Introduction
 
