@@ -2,9 +2,15 @@
 
 ## Introduction
 
-Getting an LLM to respond is straightforward. Getting it to respond consistently, at scale, with observable performance, that's where most deployments run into trouble.
+## Introduction
 
-Red Hat OpenShift AI 3.0 introduces a new inference architecture built around llm-d, which disaggregates the Prefill and Decode phases of LLM inference into separate, independently-scalable pod pools. Running this stack on IBM Fusion HCI further simplifies GPU, storage, and operator readiness for enterprise AI workloads.
+Getting an LLM to respond is straightforward. Getting it to respond consistently at scale, with observable performance, that’s where most deployments run into trouble.
+
+Traditional LLM deployments often struggle with scaling inefficiencies, high latency, and limited visibility into where time is spent during inference.
+
+Red Hat OpenShift AI 3.0 introduces a new inference architecture built around llm-d (LLM Disaggregated Inference), which separates the Prefill and Decode phases of LLM inference into independently scalable pod pools. This approach addresses key challenges by isolating compute-heavy and memory-bound workloads, improving KV cache reuse across requests, and enabling fine-grained observability into each stage of inference.
+
+Running this stack on IBM Fusion HCI further simplifies GPU, storage, and operator readiness for enterprise AI workloads.
 
 This blog walks through the prerequisites, the `LLMInferenceService` CR configuration with full Prefill-Decode separation, the authentication setup via Red Hat Connectivity Link, and two rounds of load testing with real Prometheus metrics. The model used was `mistralai/Ministral-3-8B-Instruct-2512`, deployed in the `llm-model-serving` namespace on IBM Fusion HCI running OpenShift 4.19+.
 
@@ -12,7 +18,7 @@ This blog walks through the prerequisites, the `LLMInferenceService` CR configur
 
 ## Disaggregated Inference Architecture
 
-The request path from user to model looks like this:
+The end-to-end request flow from the user to the model is as follows:
 
 ```
 User Request (HTTPS)
@@ -59,8 +65,9 @@ User Request (HTTPS)
 │ (1 GPU) │  │ (1 GPU) │
 └─────────┘  └─────────┘
 ```
+In simple terms, requests pass through authentication and scheduling layers before being intelligently routed to either prefill or decode pods.
 
-**The key difference introduced by llm-d** is the EPP Scheduler layer. Traditional vLLM deployments rely on round-robin or simple load balancing. The EPP Scheduler in llm-d routes based on semantic awareness of the inference pipeline: it understands which phase a request is in (prefill vs decode), which pods have warm KV caches for similar prompts, and the current queue depth per pod. The result is measurably better GPU utilization and lower time-to-first-token (TTFT) for workloads with prompt overlap.
+**The key difference introduced by llm-d** is the EPP Scheduler layer. Traditional vLLM deployments rely on round-robin or simple load balancing. The EPP Scheduler in llm-d routes based on semantic awareness of the inference pipeline: it understands which phase a request is in (prefill vs decode), which pods have warm KV caches for similar prompts, and the current queue depth per pod. This results in better GPU utilization and lower time-to-first-token (TTFT), especially for workloads with repeated or overlapping prompts.
 
 ---
 
@@ -68,8 +75,8 @@ User Request (HTTPS)
 
 ### Platform Requirements
 
-- IBM Fusion HCI cluster installed and healthy
-- OpenShift 4.19.9+ running on Fusion
+- IBM Fusion HCI cluster installed and in a healthy state
+- OpenShift 4.19.9+ running on IBM Fusion
 - GPU-enabled worker nodes (NVIDIA GPUs)
 - Cluster admin access
 
@@ -269,7 +276,7 @@ annotations:
 
 ---
 
-## Step 2: Deploy the LLMInferenceService with PD Separation
+## Step 2: Deploy the LLMInferenceService with Prefill-Decode Separation
 
 This is the core of what makes llm-d different from a standard KServe deployment. The `LLMInferenceService` CR defines separate Prefill and Decode replica pools, and configures the EPP Scheduler with plugin weights that determine how requests are routed between them.
 
@@ -618,7 +625,7 @@ sum by(pod)(
 
 <img width="2940" height="1332" alt="image" src="https://github.com/user-attachments/assets/00b7f7ac-d3dc-40ac-b741-457d0b65b5d6" />
 
-**Analysis:** This graph shows prefix cache hit rates broken down per decode pod. The lines are not uniform; one or more pods show consistently higher cache hit rates compared to others. This uneven distribution indicates that requests with similar prompt structures are repeatedly routed to the same pod, confirming effective cache-aware scheduling. This is the most critical metric in disaggregated inference  without sustained cache hit rates. Prefill-Decode separation does not provide meaningful performance improvements.
+**Analysis:** This graph shows prefix cache hit rates broken down per decode pod. The lines are not uniform; one or more pods show consistently higher cache hit rates compared to others. This uneven distribution indicates that requests with similar prompt structures are repeatedly routed to the same pod, confirming effective cache-aware scheduling. This is the most critical metric in disaggregated inference. Without sustained cache hit rates, Prefill-Decode separation does not provide meaningful performance improvements.
 
 ### Workload Distribution
 #### Prompt Tokens (Baseline Workload)
@@ -703,9 +710,9 @@ With llm-d, metrics are available at each stage of the request lifecycle, enabli
 These metrics represent a subset of the available signals and provide useful insights into key performance characteristics of the system.
 
 They enable more targeted analysis, for example:
-Increased latency may indicate higher prefill load or reduced cache effectiveness
-Elevated decode time may suggest token generation bottlenecks
-Low cache hit rates may indicate limited prompt reuse or suboptimal routing
+- Increased latency may indicate higher prefill load or reduced cache effectiveness
+- Elevated decode time may suggest token generation bottlenecks
+- Low cache hit rates may indicate limited prompt reuse or suboptimal routing
 
 On IBM Fusion HCI, these metrics are available through the OpenShift monitoring stack when user workload monitoring is enabled.
 
