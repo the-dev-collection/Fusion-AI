@@ -2,7 +2,6 @@
 
 ## Introduction
 
-## Introduction
 
 Getting an LLM to respond is straightforward. Getting it to respond consistently at scale, with observable performance, that’s where most deployments run into trouble.
 
