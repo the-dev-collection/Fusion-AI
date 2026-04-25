@@ -1,39 +1,23 @@
 # Model Serving with Helm Charts
 
-Deploy KServe-based LLM model serving on Red Hat OpenShift AI using Helm charts. This guide focuses on Helm-specific deployment steps and configuration.
 
-For general information about model serving, prerequisites, and other deployment methods, see the [main documentation](../../Main_Readme.md).
+Deploy KServe-based LLM model serving on Red Hat OpenShift AI using **Helm charts**. This guide covers Helm-specific deployment steps and configuration.
 
-## Overview
+For general information about model serving, architecture, supported models, and common prerequisites, see the [main documentation](../../README.md).
 
-The Fusion Model Serving Helm chart provides:
-- Pre-configured model presets for popular open-source LLMs
-- Flexible custom model deployment
-- Multi-model support in the same namespace
-- Declarative GPU and memory resource management
+**Best for:** Templated deployments, multi-model management, teams familiar with Helm workflows.
 
 ---
 
 ## Prerequisites
 
-Ensure you have:
-- Red Hat OpenShift AI installed with KServe enabled
-- Helm 3.x installed
-- GPU-enabled worker nodes (for LLM serving)
-- `oc` CLI authenticated to your cluster
+In addition to the [common prerequisites](../../README.md#prerequisites):
 
-For detailed prerequisites, see [Main Documentation - Prerequisites](../../Main_Readme.md#prerequisites).
+- **Helm 3.x** installed on your workstation
 
-### Install Helm
-
-If Helm is not installed:
-
+Install Helm if needed:
 ```bash
 curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-```
-
-Verify installation:
-```bash
 helm version
 ```
 
@@ -41,13 +25,13 @@ helm version
 
 ## Available Model Presets
 
-Pre-configured values files in [`values/`](./values/):
+Pre-configured values files are provided in [`values/`](./values/):
 
 | Model | Values File | Description |
 |-------|-------------|-------------|
-| **IBM Granite 3.2 8B Instruct** | [`values/granite.yaml`](./values/granite.yaml) | Enterprise-focused instruction-tuned model |
-| **Qwen 2.5 7B Instruct** | [`values/qwen.yaml`](./values/qwen.yaml) | High-performance multilingual model |
-| **Ministral 3 8B Instruct** | [`values/mistral.yaml`](./values/mistral.yaml) | Efficient instruction-following model |
+| **IBM Granite 3.2 8B Instruct** | `values/granite.yaml` | Enterprise-focused instruction-tuned model |
+| **Qwen 2.5 7B Instruct** | `values/qwen.yaml` | High-performance multilingual model |
+| **Ministral 3B Instruct** | `values/mistral.yaml` | Efficient instruction-following model |
 
 ---
 
@@ -86,7 +70,7 @@ helm install mistral-serve ./fusion-model-serving/deploy/helm \
 
 ## Deploying Multiple Models
 
-Deploy multiple models in the same namespace using different release names:
+Deploy multiple models to the same namespace using different Helm release names. Each release creates an independent `InferenceService` with its own dedicated resources.
 
 ```bash
 # Deploy Granite
@@ -106,7 +90,7 @@ helm install mistral-serve ./fusion-model-serving/deploy/helm \
   -f ./fusion-model-serving/deploy/helm/values/mistral.yaml
 ```
 
-Each release creates an independent InferenceService with dedicated resources.
+
 
 ---
 
@@ -120,7 +104,7 @@ cp ./fusion-model-serving/deploy/helm/values.yaml ./my-custom-model.yaml
 
 ### 2. Configure Model Parameters
 
-Edit `my-custom-model.yaml`:
+Edit `my-custom-model.yaml` file:
 
 ```yaml
 labels:
@@ -178,25 +162,38 @@ helm upgrade --install qwen-serve ./fusion-model-serving/deploy/helm \
   --set resources.limits.memory="32Gi"
 ```
 
+### Useful Helm commands
+```bash
+# List all releases
+helm list -n model-serving
+
+# View current values for a release
+helm get values qwen-serve -n model-serving
+
+# View rendered manifests
+helm get manifest qwen-serve -n model-serving
+
+# View release history
+helm history qwen-serve -n model-serving
+
+# Rollback to a previous revision
+helm rollback qwen-serve 1 -n model-serving
+
+# Uninstall a model
+helm uninstall qwen-serve -n model-serving
+```
+
 ---
 
 ## Monitoring
-
-### Check Release Status
-
 ```bash
+# Check all releases
 helm list -n model-serving
-```
 
-### Monitor InferenceService
-
-```bash
+# Monitor InferenceService status
 oc get inferenceservice -n model-serving
-```
 
-### Watch Pods
-
-```bash
+# Watch pod creation
 oc get pods -n model-serving -w
 ```
 
@@ -207,91 +204,6 @@ oc get pods -n model-serving -w
 4. **Ready**: Serving requests
 
 ---
-
-## Useful Helm Commands
-
-```bash
-# List releases
-helm list -n model-serving
-
-# View release values
-helm get values qwen-serve -n model-serving
-
-# View rendered manifests
-helm get manifest qwen-serve -n model-serving
-
-# Get release history
-helm history qwen-serve -n model-serving
-
-# Rollback to previous version
-helm rollback qwen-serve 1 -n model-serving
-
-# Uninstall a model
-helm uninstall qwen-serve -n model-serving
-```
-
----
-
-## Exposing Models
-
-By default, models are only accessible within the cluster. To expose externally, use the `expose-model.sh` script:
-
-```bash
-# Expose all models
-./fusion-model-serving/scripts/expose-model.sh model-serving
-
-# Expose specific model
-./fusion-model-serving/scripts/expose-model.sh qwen-2-5-7b-instruct model-serving
-```
-
-See [Main Documentation - Exposing Models](../../Main_Readme.md#exposing-models-for-external-access) for details.
-
----
-
-## Troubleshooting
-
-### Model Stuck in Pending
-
-**Check GPU availability:**
-```bash
-oc describe node <worker-node> | grep -i gpu
-oc describe pod <predictor-pod> -n model-serving
-```
-
-### Model Download Failures
-
-**Check logs:**
-```bash
-oc logs <predictor-pod> -n model-serving
-```
-
-**For gated models, create token secret:**
-```bash
-oc create secret generic hf-token \
-  --from-literal=token=<your-hf-token> \
-  -n model-serving
-```
-
-### Out of Memory Errors
-
-**Increase memory in values file:**
-```yaml
-resources:
-  limits:
-    memory: "32Gi"
-  requests:
-    memory: "32Gi"
-```
-
-**Then upgrade:**
-```bash
-helm upgrade qwen-serve ./fusion-model-serving/deploy/helm \
-  --namespace model-serving \
-  -f ./my-updated-values.yaml
-```
-
----
-
 ## Advanced Configuration
 
 ### Multi-GPU Deployment
@@ -327,15 +239,62 @@ model:
   extraArgs:
     - "--api-key=your-secure-api-key"
 ```
+---
+## Troubleshooting
 
+### Model Stuck in Pending
+
+**Check GPU availability:**
+```bash
+oc describe node <worker-node> | grep -i gpu
+oc describe pod <predictor-pod> -n model-serving
+```
+
+### Model Download Failures
+
+**Check logs:**
+```bash
+oc logs <predictor-pod> -n model-serving
+```
+
+**For gated models, create token secret:**
+```bash
+oc create secret generic hf-token \
+  --from-literal=token=<your-hf-token> \
+  -n model-serving
+```
+
+### Out of Memory Errors
+
+**Increase memory in your values file and upgrade:**
+```yaml
+resources:
+  limits:
+    memory: "32Gi"
+  requests:
+    memory: "32Gi"
+```
+
+```bash
+helm upgrade qwen-serve ./fusion-model-serving/deploy/helm \
+  --namespace model-serving \
+  -f ./my-updated-values.yaml
+```
 ---
 
-## Next Steps
+## Exposing Models for External Access
 
-- **Try GitOps**: [GitOps Deployment Guide](../gitops/README.md) for automated, version-controlled deployments
-- **Try Kubernetes**: [Kubernetes Deployment Guide](../kubernetes/README.md) for direct manifest control
-- **Configure Monitoring**: Set up Prometheus and Grafana
-- **Implement Autoscaling**: Configure HPA based on load
+By default, models are only accessible within the cluster. To expose externally, use the `expose-model.sh` script:
+
+```bash
+# Expose all models
+./fusion-model-serving/scripts/expose-model.sh model-serving
+
+# Expose specific model
+./fusion-model-serving/scripts/expose-model.sh qwen-2-5-7b-instruct model-serving
+```
+
+See [Main Documentation - Exposing Models](../../Main_Readme.md#exposing-models-for-external-access) for details.
 
 ---
 
