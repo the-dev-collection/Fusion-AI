@@ -1,5 +1,7 @@
 # Model Serving on Red Hat OpenShift AI with IBM Fusion HCI
 
+## Deploy and serve models on RHOAI using multiple deployment methods:
+
 Model serving is where machine learning delivers real value, enabling applications to consume trained models through scalable, production-ready inference endpoints.
 
 In this guide, we walk through structured approaches to serving open-source LLMs on Red Hat OpenShift AI (RHOAI) using KServe and vLLM. Deployments can be managed through GitOps, Helm charts, or native Kubernetes manifests. Running the stack on IBM Fusion HCI further simplifies GPU, storage, and operator readiness for enterprise AI workloads.
