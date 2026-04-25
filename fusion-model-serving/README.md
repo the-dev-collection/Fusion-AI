@@ -15,8 +15,6 @@ For details, refer to the official documentation: [Red Hat OpenShift AI Document
 
 ## Architecture Overview
 
-### Model Serving Stack
-
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    External Clients                         │
@@ -51,74 +49,17 @@ For details, refer to the official documentation: [Red Hat OpenShift AI Document
 
 ---
 
-## Deployment Methods
+## Supported Models
 
-This repository provides **three deployment approaches** for model serving, each suited to different use cases and operational preferences:
+This repository includes pre-configured deployments for popular open-source LLMs:
 
-### 1. GitOps with Red Hat OpenShift GitOps (Argo CD)
+| Model | Size | Description |
+|-------|------|-------------|
+| **IBM Granite 3.2 8B Instruct** | 8B | Enterprise-focused instruction-tuned model |
+| **Qwen 2.5 7B Instruct** | 7B | High-performance multilingual model |
+| **Ministral 3 8B Instruct** | 8B | Efficient instruction-following model |
 
-**Recommended for production environments**
-
-GitOps treats model serving configuration as source-controlled infrastructure. With Argo CD continuously reconciling the cluster against Git, deployments become:
-- Versioned and auditable
-- Fully automated
-- Self-healing
-- Consistent across environments
-
-**Use Cases:**
-- Production deployments requiring audit trails
-- Multi-environment workflows (dev, staging, prod)
-- Teams practicing GitOps methodologies
-- Automated CI/CD pipelines
-
-**[Read the Complete GitOps Deployment Guide](./deploy/gitops/README.md)**
-
----
-
-### 2. Helm Charts
-
-**Recommended for templated, reusable deployments**
-
-Helm provides a simple, reusable way to deploy multiple models as independent InferenceService resources with declarative configuration management. Pre-configured model presets make deployment straightforward.
-
-**Use Cases:**
-- Templated deployments across multiple environments
-- Easy upgrades and rollbacks
-- Multi-model deployment management
-- Teams familiar with Helm workflows
-
-**[Read the Complete Helm Deployment Guide](./deploy/helm/README.md)**
-
----
-
-### 3. Kubernetes Manifests
-
-**Recommended for direct control and quick prototyping**
-
-Deploy models using native Kubernetes manifests and the `oc` command-line tool. This approach provides direct control over resource definitions and is ideal for imperative deployment workflows.
-
-**Use Cases:**
-- Quick prototyping and testing
-- Direct control over resource definitions
-- CI/CD integration with existing pipelines
-- Learning and experimentation
-
-**[Read the Complete Kubernetes Deployment Guide](./deploy/kubernetes/README.md)**
-
----
-
-## Quick Comparison
-
-| Feature | GitOps | Helm | Kubernetes Manifests |
-|---------|--------|------|---------------------|
-| **Deployment Method** | Argo CD Application | Helm install/upgrade | oc apply |
-| **Version Control** | ✅ Git-native | ⚠️ Manual | ⚠️ Manual |
-| **Automated Sync** | ✅ Continuous | ❌ Manual | ❌ Manual |
-| **Self-Healing** | ✅ Automatic | ❌ Manual | ❌ Manual |
-| **Rollback** | ✅ Git revert | ✅ helm rollback | ⚠️ Manual |
-| **Multi-Environment** | ✅ Branch-based | ✅ Values files | ⚠️ Multiple files |
-| **Learning Curve** | Medium | Low-Medium | Low |
-| **Best For** | Production | Templated deploys | Quick prototyping |
+**Custom Models:** All deployment methods support custom model configurations. Refer to the respective deployment guides for instructions on deploying your own models from Hugging Face or other sources.
 
 ---
 
@@ -128,7 +69,7 @@ Before deploying models, ensure the following infrastructure and platform compon
 
 ### Cluster and Platform Requirements
 - IBM Fusion HCI cluster installed, running, and healthy
-- Red Hat OpenShift Container Platform 4.18 or later accessible
+- Red Hat OpenShift Container Platform 4.18 or later is accessible
 - At least one worker node capable of running AI workloads
   - GPU-enabled if serving large language models (LLMs)
 
@@ -136,7 +77,7 @@ Before deploying models, ensure the following infrastructure and platform compon
 If serving GPU-backed models such as vLLM-based LLMs, the following components must be installed:
 - Node Feature Discovery (NFD) for hardware detection
 - NVIDIA GPU Operator
-- Worker nodes automatically labeled by the NVIDIA GPU Operator (for example: nvidia.com/gpu.present=true)
+- Worker nodes automatically labelled by the NVIDIA GPU Operator (for example: nvidia.com/gpu.present=true)
 
 Verify GPU availability:
 ```bash
@@ -175,17 +116,54 @@ The following operators must be installed and in a Ready state:
 
 ---
 
-## Supported Models
+## Deployment Methods
 
-This repository includes pre-configured deployments for popular open-source LLMs:
+This repository provides **three deployment approaches** for model serving, each suited to different use cases and operational preferences:
 
-| Model | Size | Description |
-|-------|------|-------------|
-| **IBM Granite 3.2 8B Instruct** | 8B | Enterprise-focused instruction-tuned model |
-| **Qwen 2.5 7B Instruct** | 7B | High-performance multilingual model |
-| **Ministral 3 8B Instruct** | 8B | Efficient instruction-following model |
+### 1. GitOps with Red Hat OpenShift GitOps (Argo CD)
 
-**Custom Models:** All deployment methods support custom model configurations. Refer to the respective deployment guides for instructions on deploying your own models from Hugging Face or other sources.
+Uses Red Hat OpenShift GitOps (Argo CD) to continuously reconcile model serving configuration from Git. All resources are version-controlled, drift is auto-corrected, and deployments are self-healing.
+
+**Best for:** Production environments, multi-environment workflows, teams practising GitOps.
+
+
+**[Read the Complete GitOps Deployment Guide](./deploy/gitops/README.md)**
+
+---
+
+### 2. Helm Charts
+
+Uses Helm charts with pre-configured model presets and `values.yaml` files. Supports easy multi-model deployment, upgrades, and rollbacks from the command line.
+
+**Best for:** Templated deployments, teams familiar with Helm, quick multi-model management.
+
+
+**[Read the Complete Helm Deployment Guide](./deploy/helm/README.md)**
+
+---
+
+### 3. Kubernetes Manifests
+
+Uses native Kubernetes YAML manifests applied with `oc apply -f`. Provides direct control over every resource definition with minimal tooling.
+
+**Best for:** Quick prototyping, learning, CI/CD pipelines, direct resource control.
+
+**[Read the Complete Kubernetes Deployment Guide](./deploy/kubernetes/README.md)**
+
+---
+
+## Quick Comparison
+
+| Feature | GitOps | Helm | Kubernetes Manifests |
+|---------|--------|------|---------------------|
+| **Deployment Method** | Argo CD Application | Helm install/upgrade | oc apply |
+| **Version Control** | ✅ Git-native | ⚠️ Manual | ⚠️ Manual |
+| **Automated Sync** | ✅ Continuous | ❌ Manual | ❌ Manual |
+| **Self-Healing** | ✅ Automatic | ❌ Manual | ❌ Manual |
+| **Rollback** | ✅ Git revert | ✅ helm rollback | ⚠️ Manual |
+| **Multi-Environment** | ✅ Branch-based | ✅ Values files | ⚠️ Multiple files |
+| **Learning Curve** | Medium | Low-Medium | Low |
+| **Best For** | Production | Templated deploys | Quick prototyping |
 
 ---
 
@@ -272,29 +250,6 @@ curl -k -X POST https://granite-3-2-8b-instruct-external-model-serving.apps.clus
 
 ---
 
-## Getting Started
-
-Choose your preferred deployment method and follow the corresponding guide:
-
-### For Production Deployments
-**→ [GitOps Deployment Guide](./deploy/gitops/README.md)**
-- Complete setup with Argo CD
-- Git-based configuration management
-- Automated synchronization and self-healing
-
-### For Templated Deployments
-**→ [Helm Deployment Guide](./deploy/helm/README.md)**
-- Pre-configured model presets
-- Easy customization through values files
-- Simple upgrades and rollbacks
-
-### For Quick Prototyping
-**→ [Kubernetes Deployment Guide](./deploy/kubernetes/README.md)**
-- Direct YAML manifest editing
-- Simple `oc apply` commands
-- Fast iteration and testing
-
----
 
 ## Key Takeaways
 
