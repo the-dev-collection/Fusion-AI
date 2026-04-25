@@ -1,8 +1,44 @@
 
-## Required Platform Operators
-The following operators must be installed and in a Ready state:
-  - Red Hat OpenShift GitOps (Argo CD)
-    - Enables declarative, Git-driven deployment and reconciliation.
+# GitOps Deployment Guide
+
+Deploy and manage model serving on Red Hat OpenShift AI using **Red Hat OpenShift GitOps (Argo CD)**. This approach treats all model serving configuration as source-controlled infrastructure, with Argo CD continuously reconciling the cluster state against Git.
+
+For general information about model serving, architecture, supported models, and common prerequisites, see the [main documentation](../../README.md).
+
+**Best for:** Production environments, multi-environment workflows, and teams practising GitOps methodologies.
+
+## Prerequisites
+
+In addition to the [common prerequisites](../../README.md#prerequisites):
+
+- **Red Hat OpenShift GitOps operator** installed and in a `Ready` state
+- Argo CD instance accessible (default namespace: `openshift-gitops`)
+- Your fork/clone of this repository pushed to a Git remote that Argo CD can reach
+
+Verify Argo CD is running:
+```bash
+oc get pods -n openshift-gitops
+```
+## Argo CD Access and Permissions
+After verifying that all prerequisites are satisfied, ensure you can access the Argo CD instance deployed by the OpenShift GitOps operator.
+
+#### Authenticate to the cluster:
+```bash
+oc login --token=<TOKEN> --server=<API_SERVER>
+```
+To allow the GitOps application to create required resources (namespaces, roles, rolebindings, and KServe custom resources), temporarily grant cluster-admin permissions (lab environments only) to the Argo CD application controller:
+```bash
+oc adm policy add-cluster-role-to-user cluster-admin \
+  -z openshift-gitops-argocd-application-controller \
+  -n openshift-gitops
+```
+This ensures the Argo CD controller can successfully reconcile all manifests defined in this guide.
+
+**NOTE:** This approach is suitable for lab or proof-of-concept environments.
+In production, use a dedicated ServiceAccount with scoped RBAC permissions aligned with organizational security policies.
+
+With cluster access and Argo CD permissions configured, you can now prepare your GitOps repository for deployment.
+
     
 ## Deploying the Model Serving Application 
 
@@ -20,12 +56,12 @@ Ensure the repository URL matches the fork you cloned and are using as your GitO
 
 Apply the application YAML:
 ```bash
-oc apply -f fusion-model-serving/gitops/model-serving-application.yaml
+oc apply -f fusion-model-serving/deploy/gitops/applications/model-serving-application.yaml
 ```
 
 This creates an Argo CD Application that points to:
 ```
-fusion-model-serving/gitops/models
+fusion-model-serving/deploy/gitops/cluster
 ```
 The Application name defaults to llmops-models but can be customized in the Application manifest metadata.
 
@@ -103,33 +139,6 @@ The application should display:
 
 
 ---
-## Exposing the Model for External Access
-By default, KServe creates internal ClusterIP services for InferenceServices. These services are not externally accessible in OpenShift unless explicitly exposed using a Route or Ingress.
-
-By default, KServe InferenceServices are only accessible within the cluster. To make them available to external applications (dashboards, APIs, or client tools), use the included expose-model.sh script to create an OpenShift Edge-terminated Route.
-
-The `expose-model.sh` utility automatically generates OpenShift Routes with TLS encryption, making your models available outside the cluster.
-
-It supports two usage modes:
-
-#### 1. Expose All Models in a Namespace
-
-To expose every deployed InferenceService in a given namespace:
-```bash
-# Expose all models in a namespace
-./scripts/expose-model.sh <namespace>
-```
-
-```bash
-# Example
-./scripts/expose-model.sh test-model-serving
-```
-
-This will:
-  - Discover all InferenceServices in the namespace
-  - Create TLS-secured OpenShift Routes for each model
-  - Display the external access URLs and test commands
-
 
 ## Customizing the Model Serving Application
 
@@ -211,3 +220,13 @@ By configuring both requests and limits, this patch ensures predictable GPU-back
 
 Ensure that the requested GPU and memory values align with the actual node capacity.
 If insufficient resources are available, the InferenceService will remain Pending.
+
+
+## Additional Resources
+
+- [Red Hat OpenShift GitOps Documentation](https://docs.openshift.com/gitops/latest/)
+- [Argo CD Documentation](https://argo-cd.readthedocs.io/)
+- [KServe Documentation](https://kserve.github.io/website/)
+- [vLLM Documentation](https://docs.vllm.ai/)
+- [Red Hat OpenShift AI Documentation](https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed)
+
