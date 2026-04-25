@@ -1,6 +1,5 @@
 # Model Serving on Red Hat OpenShift AI with IBM Fusion HCI
 
-## Deploy and serve models on RHOAI using multiple deployment methods:
 
 Model serving is where machine learning delivers real value, enabling applications to consume trained models through scalable, production-ready inference endpoints.
 
@@ -11,6 +10,44 @@ In this guide, we walk through structured approaches to serving open-source LLMs
 Red Hat OpenShift AI (RHOAI) extends the capabilities of Red Hat OpenShift to deliver a consistent, enterprise-ready hybrid AI and MLOps platform. It provides tooling across the full lifecycle of AI/ML workloads, including training, serving, monitoring, and managing models and AI-enabled applications.
 
 For details, refer to the official documentation: [Red Hat OpenShift AI Documentation](https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed)
+
+---
+
+## Architecture Overview
+
+### Model Serving Stack
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    External Clients                         │
+│              (Applications, APIs, Dashboards)               |
+└────────────────────────┬────────────────────────────────────┘
+                         │
+                         │ HTTPS (TLS)
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│              OpenShift Route (Edge Termination)             │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│                  KServe InferenceService                    │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │              Predictor (vLLM Runtime)                │   │
+│  │  • Model: Hugging Face LLM                           │   │
+│  │  • Runtime: vLLM with OpenAI-compatible API          │   │
+│  │  • Resources: GPU, Memory, CPU                       │   │
+│  └──────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│                  IBM Fusion HCI Infrastructure              │
+│  • GPU-enabled Worker Nodes (NVIDIA GPU Operator)           │
+│  • Persistent Storage (IBM Fusion Data Foundation)          │
+│  • High-performance Networking                              │
+└─────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -256,44 +293,6 @@ Choose your preferred deployment method and follow the corresponding guide:
 - Direct YAML manifest editing
 - Simple `oc apply` commands
 - Fast iteration and testing
-
----
-
-## Architecture Overview
-
-### Model Serving Stack
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    External Clients                          │
-│              (Applications, APIs, Dashboards)                │
-└────────────────────────┬────────────────────────────────────┘
-                         │
-                         │ HTTPS (TLS)
-                         ▼
-┌─────────────────────────────────────────────────────────────┐
-│              OpenShift Route (Edge Termination)              │
-└────────────────────────┬────────────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────────────┐
-│                  KServe InferenceService                     │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │              Predictor (vLLM Runtime)                │   │
-│  │  • Model: Hugging Face LLM                          │   │
-│  │  • Runtime: vLLM with OpenAI-compatible API         │   │
-│  │  • Resources: GPU, Memory, CPU                      │   │
-│  └──────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────────────┐
-│                  IBM Fusion HCI Infrastructure               │
-│  • GPU-enabled Worker Nodes (NVIDIA GPU Operator)           │
-│  • Persistent Storage (IBM Fusion Data Foundation)          │
-│  • High-performance Networking                              │
-└─────────────────────────────────────────────────────────────┘
-```
 
 ---
 
