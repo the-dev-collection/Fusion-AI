@@ -1,28 +1,18 @@
 # Model Serving with Kubernetes Manifests
 
-Deploy KServe-based LLM model serving on Red Hat OpenShift AI using native Kubernetes manifests and the `oc` command-line tool. This guide focuses on direct YAML manifest deployment.
+Deploy KServe-based LLM model serving on Red Hat OpenShift AI using native Kubernetes manifests and the `oc` command-line tool. This guide covers direct YAML manifest deployment.
 
-For general information about model serving, prerequisites, and other deployment methods, see the [main documentation](../../Main_Readme.md).
+For general information about model serving, architecture, supported models, and common prerequisites, see the [main documentation](../../README.md).
 
-## Overview
-
-This deployment method provides:
-- Direct control over resource definitions
-- Simple `oc apply` commands
-- Quick prototyping and testing
-- Easy CI/CD integration
+**Best for:** Quick prototyping, learning, CI/CD integration, and scenarios requiring direct control over resource definitions.
 
 ---
-
 ## Prerequisites
 
-Ensure you have:
-- Red Hat OpenShift AI installed with KServe enabled
-- GPU-enabled worker nodes (for LLM serving)
-- `oc` CLI authenticated to your cluster
-- Sufficient RBAC permissions
+In addition to the [common prerequisites](../../README.md#prerequisites):
 
-For detailed prerequisites, see [Main Documentation - Prerequisites](../../Main_Readme.md#prerequisites).
+- `oc` CLI authenticated to your cluster
+- Sufficient RBAC to create namespaces and `InferenceService` resources
 
 ---
 
@@ -65,7 +55,7 @@ oc describe inferenceservice granite-llm -n model-serving
 
 ## Understanding the InferenceService Manifest
 
-The [`kserve-model-serving.yaml`](./kserve-model-serving.yaml) defines a KServe InferenceService. Key sections:
+The [`kserve-model-serving.yaml`](./kserve-model-serving.yaml) defines a KServe ₹InferenceService. Key sections:
 
 ### Metadata
 
@@ -123,7 +113,16 @@ args:
 
 ---
 
+
 ## Deploying Different Models
+
+When switching to a different model, the **required** changes are:
+
+1. **`metadata.name`** — must be unique within the namespace (e.g. `qwen-2-5-7b-instruct`)
+2. **`env.MODEL` value** — the Hugging Face model path
+3. **`metadata.labels.model`** — for organisation and filtering
+
+All other fields are optional customisations.
 
 ### Example 1: Deploy Qwen 2.5 7B Instruct
 
@@ -153,25 +152,9 @@ spec:
 oc apply -f qwen-model.yaml
 ```
 
-### Example 2: Deploy Mistral 7B Instruct
+### Example 2: Larger Model with More Resources
 
-```yaml
-metadata:
-  name: mistral-7b-instruct
-  labels:
-    model: mistral
-
-spec:
-  predictor:
-    containers:
-    - env:
-      - name: MODEL
-        value: "mistralai/Mistral-7B-Instruct-v0.2"
-```
-
-### Example 3: Larger Model with More Resources
-
-For models like Llama 2 13B:
+For a model requiring multiple GPUs (e.g. Llama 2 13B):
 
 ```yaml
 metadata:
@@ -288,7 +271,7 @@ oc logs <predictor-pod-name> -n model-serving -f
 
 ### Update Deployment
 
-Edit manifest and reapply:
+Edit the manifest and reapply:
 ```bash
 oc apply -f fusion-model-serving/deploy/kubernetes/kserve-model-serving.yaml
 ```
@@ -325,27 +308,11 @@ oc get inferenceservice -n model-serving
 
 ---
 
-## Exposing Models
-
-By default, models are only accessible within the cluster. To expose externally:
-
-```bash
-# Expose all models
-./fusion-model-serving/scripts/expose-model.sh model-serving
-
-# Expose specific model
-./fusion-model-serving/scripts/expose-model.sh granite-llm model-serving
-```
-
-See [Main Documentation - Exposing Models](../../Main_Readme.md#exposing-models-for-external-access) for details.
-
----
-
 ## Troubleshooting
 
 ### Model Stuck in Pending
 
-**Check GPU and scheduling:**
+Check GPU availability and pod scheduling events:
 ```bash
 oc describe node <worker-node> | grep -i gpu
 oc describe pod <predictor-pod> -n model-serving
@@ -354,19 +321,19 @@ oc get pods -n nvidia-gpu-operator
 
 ### Model Download Failures
 
-**Check logs:**
+Check container logs:
 ```bash
 oc logs <predictor-pod> -n model-serving
 ```
 
-**For gated models:**
+For gated Hugging Face models, create a token secret and reference it in the manifest:
 ```bash
 oc create secret generic hf-token \
   --from-literal=token=<your-hf-token> \
   -n model-serving
 ```
 
-Add to manifest:
+Add to the container env section:
 ```yaml
 env:
 - name: HUGGING_FACE_HUB_TOKEN
@@ -378,7 +345,7 @@ env:
 
 ### Out of Memory Errors
 
-Increase memory in manifest:
+Increase the memory limits in the manifest and reapply:
 ```yaml
 resources:
   limits:
@@ -387,7 +354,6 @@ resources:
     memory: "32Gi"
 ```
 
-Reapply:
 ```bash
 oc apply -f your-model.yaml
 ```
@@ -404,31 +370,20 @@ oc run test-vllm --image=vllm/vllm-openai:latest --rm -it -- /bin/bash
 
 ---
 
-## Best Practices
 
-### Resource Planning
-- Ensure GPU requests match node capacity
-- Allocate sufficient memory for model size
-- Provide adequate CPU for preprocessing
+## Exposing Models
 
-### Security
-- Use proper authentication in production
-- Implement network policies
-- Use dedicated ServiceAccounts with minimal permissions
+By default, models are only accessible within the cluster. To expose externally:
 
-### Performance
-- Tune `--gpu-memory-utilization` based on workload
-- Adjust `--max-num-seqs` for throughput
-- Enable `--enable-prefix-caching` for repeated prompts
+```bash
+# Expose all models
+./fusion-model-serving/scripts/expose-model.sh model-serving
 
----
+# Expose specific model
+./fusion-model-serving/scripts/expose-model.sh granite-llm model-serving
+```
 
-## Next Steps
-
-- **Try GitOps**: [GitOps Deployment Guide](../gitops/README.md) for automated deployments
-- **Try Helm**: [Helm Deployment Guide](../helm/README.md) for templated deployments
-- **Configure Monitoring**: Set up Prometheus and Grafana
-- **Implement Autoscaling**: Configure HPA based on load
+See [Main Documentation - Exposing Models](../../Main_Readme.md#exposing-models-for-external-access) for details.
 
 ---
 
